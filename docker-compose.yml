@@ -16,7 +16,7 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
 
     healthcheck:
-      test: [ "CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list" ]
+      test: [ "CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "kafka:9092", "--list" ]
 
   kafka-init:
     image: apache/kafka:3.9.0
@@ -49,3 +49,37 @@ services:
       nofile:
         soft: 65536
         hard: 65536
+  flink-jobmanager:
+    image: flink:1.20-java11
+    container_name: flink-jobmanager
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    environment:
+      FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager"
+
+  flink-taskmanager:
+    image: flink:1.20-java11
+    container_name: flink-taskmanager
+    depends_on:
+      - flink-jobmanager
+      - kafka
+    command: taskmanager
+    environment:
+      FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager"
+
+  flink-job:
+    build: ./flink-job
+    container_name: flink-job
+    depends_on:
+      - flink-jobmanager
+      - flink-taskmanager
+      - kafka
+    command: >
+      bash -c "
+      sleep 10 &&
+      /opt/flink/bin/flink run 
+      --jobmanager flink-jobmanager:8081 
+      --detached 
+      /opt/flink/usrlib/taxi-processor-1.0.jar
+      "
