@@ -57,24 +57,34 @@ services:
     command: jobmanager
     environment:
       FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager"
-
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      
   flink-taskmanager:
     image: flink:1.20-java11
     container_name: flink-taskmanager
     depends_on:
-      - flink-jobmanager
-      - kafka
+      flink-jobmanager:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
     command: taskmanager
     environment:
       FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager"
-
+      
   flink-job:
     build: ./flink-job
     container_name: flink-job
     depends_on:
-      - flink-jobmanager
-      - flink-taskmanager
-      - kafka
+      flink-jobmanager:
+        condition: service_healthy 
+      flink-taskmanager:
+        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
     command: >
       bash -c "
       sleep 10 &&

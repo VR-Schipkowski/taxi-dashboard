@@ -8,6 +8,7 @@ import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.configuration.Configuration;
 
+//old, bad approach, up for deletion later
 public class SpeedCalculator extends RichMapFunction<TaxiLocation, TaxiSpeed> {
 
     private transient ValueState<TaxiLocation> previousLocation;
@@ -26,22 +27,20 @@ public class SpeedCalculator extends RichMapFunction<TaxiLocation, TaxiSpeed> {
         double speed = 0.0;
 
         if (previous != null) {
-            double distanceKm = Helper.calculateDistance(
-                    previous.latitude, previous.longitude,
-                    current.latitude, current.longitude
-            );
+            double timeDiffSeconds = Helper.calculateTimeDifferenceSeconds(previous.timestamp, current.timestamp);
+            double timeDiffHours = Helper.calculateTimeDifferenceHours(previous.timestamp, current.timestamp);
 
-            double timeDiffHours = Helper.calculateTimeDifferenceHours(
-                    previous.timestamp,
-                    current.timestamp
-            );
-
-            if (timeDiffHours > 0) {
+            if (timeDiffSeconds > 10.){
+                double distanceKm = Helper.calculateDistance(
+                previous.latitude, previous.longitude,
+                current.latitude, current.longitude);
                 speed = distanceKm / timeDiffHours;
+                previousLocation.update(current);
             }
         }
-
-        previousLocation.update(current);
+        else {
+            previousLocation.update(current);
+        }
 
         return new TaxiSpeed(
                 current.taxiId,

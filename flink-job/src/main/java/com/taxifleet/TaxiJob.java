@@ -1,7 +1,7 @@
 package com.taxifleet;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.taxifleet.functions.SpeedCalculator;
+import com.taxifleet.functions.*;
 import com.taxifleet.models.TaxiLocation;
 import com.taxifleet.models.TaxiSpeed;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
@@ -10,6 +10,9 @@ import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
+import org.apache.flink.streaming.api.windowing.assigners.SlidingProcessingTimeWindows;
+
+import java.time.Duration;
 
 public class TaxiJob {
     public static void main(String[] args) throws Exception {
@@ -33,16 +36,30 @@ public class TaxiJob {
         );
 
         DataStream<TaxiLocation> locationStream = kafkaStream
-                .map(json -> {
-                    ObjectMapper mapper = new ObjectMapper();
-                    return mapper.readValue(json, TaxiLocation.class);
-                })
-                .name("Parse JSON");
+        .map(json -> {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readValue(json, TaxiLocation.class);
+        })
+        .filter(location ->
+                location.latitude >= -90 &&
+                location.latitude <= 90 &&
+                location.longitude >= -180 &&
+                location.longitude <= 180 &&
+                location.latitude != 0.0 &&
+                location.longitude != 0.0
+        )
+        .name("Parse JSON");
 
         DataStream<TaxiSpeed> speedStream = locationStream
-                .keyBy(taxi -> taxi.taxiId)
-                .map(new SpeedCalculator())
-                .name("Calculate Speed");
+                .keyBy(location -> location.taxiId)
+                .process(new LocationSanitizer())
+                .keyBy(location -> location.taxiId)
+                .window(SlidingProcessingTimeWindows.of(
+                        Duration.ofMinutes(1),
+                        Duration.ofSeconds(20)
+                ))
+                .process(new TotalDistanceSpeedCalculator())
+                .name("Total Distance Speed Calculator");
 
         speedStream.print();
 

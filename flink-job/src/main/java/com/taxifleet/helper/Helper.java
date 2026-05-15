@@ -43,4 +43,11 @@ public class Helper {
         long diffMs = Math.abs(time2Ms - time1Ms);
         return diffMs / (1000.0 * 60.0 * 60.0);
     }
+
+    public static double calculateTimeDifferenceSeconds(String timestamp1, String timestamp2) {
+        long time1Ms = parseTimestamp(timestamp1);
+        long time2Ms = parseTimestamp(timestamp2);
+        long diffMs = Math.abs(time2Ms - time1Ms);
+        return diffMs / (1000.0);
+    }
 }
