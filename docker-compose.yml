@@ -43,7 +43,7 @@ services:
       kafka-init:
         condition: service_completed_successfully
     volumes:
-      - "./provider/data/T-drive Taxi Trajectories/release/taxi_log_2008_by_id:/taxi-data:ro"
+      - "/home/geschen/Desktop/big_data/data:/taxi-data:ro"
     command: --data-dir /taxi-data --bootstrap-servers kafka:9092 --speed-factor 1
     ulimits:
       nofile:
@@ -85,6 +85,8 @@ services:
         condition: service_started
       kafka-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     command: >
       bash -c "
       sleep 10 &&
@@ -93,3 +95,14 @@ services:
       --detached 
       /opt/flink/usrlib/taxi-processor-1.0.jar
       "
+  
+  redis:
+    image: redis:7.2
+    container_name: redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
