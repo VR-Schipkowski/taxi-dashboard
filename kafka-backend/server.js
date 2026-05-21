@@ -44,10 +44,7 @@ async function startKafka() {
         },
     });
 }
-
-// Intervall: Alle 5 Sekunden den aktuellen Stand an alle verbundenen Webseiten senden
 setInterval(() => {
-    // Wandelt das Objekt { "1": {...}, "2": {...} } in ein Array [{...}, {...}] um
     const positionsArray = Object.values(latestTaxiPositions);
 
     if (positionsArray.length > 0) {
