@@ -57,6 +57,7 @@ setInterval(() => {
         });
 
         console.log(`[Interval] ${positionsArray.length} Taxi-Positionen an Frontend gesendet.`);
+        latestTaxiPositions = {};
     }
 }, 5000); // 5000 Millisekunden = 5 Sekunden
 

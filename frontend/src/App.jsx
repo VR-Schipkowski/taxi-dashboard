@@ -1,122 +1,97 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+
+// Wichtig: Leaflet-CSS-Styles importieren (sonst zerreißt es die Karte)
+import 'leaflet/dist/leaflet.css';
+
+// Fix für Standard-Marker-Icons in Leaflet bei der Nutzung mit Build-Tools wie Vite
+import markerIconPng from 'leaflet/dist/images/marker-icon.png';
+import markerShadowPng from 'leaflet/dist/images/marker-shadow.png';
+
+//TODO better logo, logo is to big, propabiil change on zoom level
+const defaultIcon = L.icon({
+  iconUrl: markerIconPng,
+  shadowUrl: markerShadowPng,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
+
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [taxis, setTaxis] = useState([]);
+  const [status, setStatus] = useState('Verbinden...');
+
+  useEffect(() => {
+    // Verbindung zum Node.js-Backend herstellen
+    const socket = new WebSocket('ws://localhost:5001');
+
+    socket.onopen = () => {
+      setStatus('Verbunden – Live-Stream aktiv');
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        // Das Backend sendet alle 5s ein Array aller aktuellen Taxis
+        const updatedTaxis = JSON.parse(event.data);
+        setTaxis(updatedTaxis);
+      } catch (error) {
+        console.error("Fehler beim Parsen der WebSocket-Daten:", error);
+      }
+    };
+
+    socket.onclose = () => {
+      setStatus('Verbindung zum Backend verloren');
+    };
+
+    return () => socket.close();
+  }, []);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
+    <div style={{ padding: '20px', fontFamily: 'sans-serif', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <header style={{ marginBottom: '10px' }}>
+        <h1 style={{ margin: 0 }}>🚖 Taxi Live-Tracker</h1>
+        <p style={{ margin: '5px 0' }}>
+          <strong>Status:</strong> <span style={{ color: status.includes('active') || status.includes('aktiv') ? 'green' : 'red' }}>{status}</span> |
+          <strong> Aktive Taxis auf der Karte:</strong> {taxis.length}
+        </p>
+      </header>
+
+      {/* Karten-Container */}
+      <div style={{ flex: 1, borderRadius: '8px', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+        <MapContainer
+          center={[39.9042, 116.4074]}
+          zoom={12}
+          style={{ height: '100%', width: '100%' }}
         >
-          Count is {count}
-        </button>
-      </section>
+          {/* OpenStreetMap Kacheln laden */}
+          <TileLayer
+            attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+          {/* Alle Taxis aus dem State als Marker rendern */}
+          {taxis.map((taxi) => (
+            <Marker
+              key={taxi.taxi_id}
+              position={[taxi.latitude, taxi.longitude]}
+              icon={taxiIcon}
+            >
+              <Popup>
+                <div style={{ fontSize: '14px' }}>
+                  <strong>Taxi ID:</strong> {taxi.taxi_id}<br />
+                  <strong>Zeitstempel:</strong> {taxi.timestamp}<br />
+                  <strong>Breitengrad:</strong> {taxi.latitude}<br />
+                  <strong>Längengrad:</strong> {taxi.longitude}
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      </div>
+    </div>
+  );
 }
 
-export default App
+export default App;

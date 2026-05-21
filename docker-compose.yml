@@ -44,8 +44,28 @@ services:
         condition: service_completed_successfully
     volumes:
       - "./provider/data/T-drive Taxi Trajectories/release/taxi_log_2008_by_id:/taxi-data:ro"
-    command: --data-dir /taxi-data --bootstrap-servers kafka:9092 --speed-factor 1
+    command: --data-dir /taxi-data --bootstrap-servers kafka:9092 --speed-factor 10
     ulimits:
       nofile:
         soft: 65536
         hard: 65536
+
+  kafka-backend:
+    build: ./kafka-backend
+    container_name: kafka-backend
+    ports:
+      - "5001:5001"
+    environment:
+      - KAFKA_BROKERS=kafka:9092 # Nutzt den internen Docker-Namen für Kafka
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+
+  # ─── NEU: REACT FRONTEND (VITE) ───────────────────────────────────
+  frontend:
+    build: ./frontend
+    container_name: react-frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - kafka-backend
