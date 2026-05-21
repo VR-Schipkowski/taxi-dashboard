@@ -1,5 +1,10 @@
 # BD26_Project_W4_B
 
+# run local
+
+from the main folder you can run docker compose up
+you will finde the web interface under http://localhost:5173/
+
 
 ## Getting started
 
