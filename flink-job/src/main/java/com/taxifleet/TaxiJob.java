@@ -61,10 +61,9 @@ public class TaxiJob {
                 .process(new TotalDistanceSpeedCalculator())
                 .name("Total Distance Speed Calculator");
                 // Store processed results in Redis
-                speedStream.process(new SpeedRedisProcessor("redis", 6379))
-                .name("Store Speed in Redis");
+        speedStream.process(new SpeedRedisProcessor("redis", 6379)).name("Store Speed in Redis");
                 
-                speedStream.print();
+        speedStream.print();
 
         env.execute("Taxi Fleet Monitoring");
     }
