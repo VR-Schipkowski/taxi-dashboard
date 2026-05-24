@@ -35,6 +35,7 @@ public class RedisSink implements Serializable {
         try (Jedis jedis = getJedisPool().getResource()) {
             String taxiKey = "taxi:speed:" + speed.taxiId;
             jedis.hset(taxiKey, "speed", String.valueOf(speed.speed));
+            jedis.hset(taxiKey, "distance", String.valueOf(speed.totalDistance));
             jedis.hset(taxiKey, "timestamp", String.valueOf(speed.timestamp));
             jedis.hset(taxiKey, "latitude", String.valueOf(speed.latitude));
             jedis.hset(taxiKey, "longitude", String.valueOf(speed.longitude));

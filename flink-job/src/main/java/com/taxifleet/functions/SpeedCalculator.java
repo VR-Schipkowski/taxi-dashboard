@@ -47,7 +47,8 @@ public class SpeedCalculator extends RichMapFunction<TaxiLocation, TaxiSpeed> {
                 current.timestamp,
                 current.longitude,
                 current.latitude,
-                speed
+                speed,
+                0.0
         );
     }
 }

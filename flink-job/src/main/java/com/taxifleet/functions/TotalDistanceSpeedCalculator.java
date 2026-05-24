@@ -59,7 +59,8 @@ public class TotalDistanceSpeedCalculator extends ProcessWindowFunction<TaxiLoca
             last.timestamp,
             last.longitude,
             last.latitude,
-            avgSpeed
+            avgSpeed,
+            totalDistanceKm
         ));
     }
 }

@@ -7,6 +7,7 @@ public class TaxiSpeed {
     public double longitude;
     public double latitude;
     public double speed;
+    public double totalDistance;
     public boolean isSpeeding;
 
     public TaxiSpeed() {}
@@ -18,12 +19,13 @@ public class TaxiSpeed {
         this.latitude = latitude;
     }
 
-    public TaxiSpeed(int taxiId, String timestamp, double longitude, double latitude, double speed) {
+    public TaxiSpeed(int taxiId, String timestamp, double longitude, double latitude, double speed, double totalDistance) {
         this.taxiId = taxiId;
         this.timestamp = timestamp;
         this.longitude = longitude;
         this.latitude = latitude;
         this.speed = speed;
+        this.totalDistance = totalDistance;
         this.isSpeeding = speed>60;
     }
 
