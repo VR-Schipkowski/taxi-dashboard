@@ -1,2 +1,4 @@
 provider/data/T-drive Taxi Trajectories
 kafka-backend/node_modules/*
+.idea/*
+flink-job/target/
