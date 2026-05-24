@@ -30,7 +30,8 @@ setInterval(async () => {
                 longitude: parseFloat(data.longitude),
                 timestamp: data.timestamp,
                 speed: parseFloat(data.speed),
-                distance: parseFloat(data.distance)
+                distance: parseFloat(data.distance),
+                isSpeeding: data.isSpeeding === 'true'
             });
             totalDistance += parseFloat(data.distance) || 0;
         }
