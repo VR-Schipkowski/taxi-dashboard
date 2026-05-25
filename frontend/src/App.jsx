@@ -21,28 +21,28 @@ const defaultIcon = L.icon({
 
 function App() {
   const [taxis, setTaxis] = useState([]);
-  const [status, setStatus] = useState('Verbinden...');
+  const [status, setStatus] = useState('Connecting...');
 
   useEffect(() => {
     // Verbindung zum Node.js-Backend herstellen
     const socket = new WebSocket('ws://localhost:5001');
 
     socket.onopen = () => {
-      setStatus('Verbunden – Live-Stream aktiv');
+      setStatus('Connected – Live-Stream active');
     };
 
     socket.onmessage = (event) => {
       try {
-        // Das Backend sendet alle 5s ein Array aller aktuellen Taxis
-        const updatedTaxis = JSON.parse(event.data);
-        setTaxis(updatedTaxis);
+        // backend sends taxi object every 5 seconds
+        const payload = JSON.parse(event.data);
+        setTaxis(payload.taxis || []);
       } catch (error) {
-        console.error("Fehler beim Parsen der WebSocket-Daten:", error);
+        console.error("Error parsing the WebSocket data:", error);
       }
     };
 
     socket.onclose = () => {
-      setStatus('Verbindung zum Backend verloren');
+      setStatus('Lost connection to backend');
     };
 
     return () => socket.close();
@@ -54,7 +54,7 @@ function App() {
         <h1 style={{ margin: 0 }}>🚖 Taxi Live-Tracker</h1>
         <p style={{ margin: '5px 0' }}>
           <strong>Status:</strong> <span style={{ color: status.includes('active') || status.includes('aktiv') ? 'green' : 'red' }}>{status}</span> |
-          <strong> Aktive Taxis auf der Karte:</strong> {taxis.length}
+          <strong> Active taxis on the map:</strong> {taxis.length}
         </p>
       </header>
 
@@ -76,14 +76,15 @@ function App() {
             <Marker
               key={taxi.taxi_id}
               position={[taxi.latitude, taxi.longitude]}
-              icon={taxiIcon}
+              icon={defaultIcon}
             >
               <Popup>
                 <div style={{ fontSize: '14px' }}>
                   <strong>Taxi ID:</strong> {taxi.taxi_id}<br />
-                  <strong>Zeitstempel:</strong> {taxi.timestamp}<br />
-                  <strong>Breitengrad:</strong> {taxi.latitude}<br />
-                  <strong>Längengrad:</strong> {taxi.longitude}
+                  <strong>Timestamp:</strong> {taxi.timestamp}<br />
+                  <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
+                    {taxi.isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
+                  <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km
                 </div>
               </Popup>
             </Marker>

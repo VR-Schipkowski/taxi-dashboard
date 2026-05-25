@@ -39,6 +39,8 @@ public class RedisSink implements Serializable {
             jedis.hset(taxiKey, "timestamp", String.valueOf(speed.timestamp));
             jedis.hset(taxiKey, "latitude", String.valueOf(speed.latitude));
             jedis.hset(taxiKey, "longitude", String.valueOf(speed.longitude));
+
+            jedis.expire("taxi:speed:" + speed.taxiId, 60);
         } catch (Exception e) {
             System.err.println("Failed to store data in Redis: " + e.getMessage());
             e.printStackTrace();

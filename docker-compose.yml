@@ -60,8 +60,8 @@ services:
     depends_on:
       kafka-init:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
+      redis-init:
+        condition: service_completed_successfully
 
   frontend:
     build: ./frontend
@@ -107,8 +107,8 @@ services:
         condition: service_started
       kafka-init:
         condition: service_completed_successfully
-      redis:
-        condition: service_healthy
+      redis-init:
+        condition: service_completed_successfully
     command: >
       bash -c "
       sleep 10 &&
@@ -123,8 +123,17 @@ services:
     container_name: redis
     ports:
       - "6379:6379"
+    command: redis-server --save "" --appendonly no
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
+  
+  redis-init:
+    image: redis:7.2
+    depends_on:
+      redis:
+        condition: service_healthy
+    entrypoint: ["redis-cli", "-h", "redis", "FLUSHALL"]
+    restart: "no"
