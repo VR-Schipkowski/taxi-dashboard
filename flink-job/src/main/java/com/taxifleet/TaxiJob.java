@@ -55,8 +55,8 @@ public class TaxiJob {
                 .process(new LocationSanitizer())
                 .keyBy(location -> location.taxiId)
                 .window(SlidingProcessingTimeWindows.of(
-                        Duration.ofMinutes(1),
-                        Duration.ofSeconds(20)
+                        Duration.ofSeconds(30),
+                        Duration.ofSeconds(5)
                 ))
                 .process(new TotalDistanceSpeedCalculator())
                 .name("Total Distance Speed Calculator");
