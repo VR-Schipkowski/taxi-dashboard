@@ -10,7 +10,8 @@ public class TaxiSpeed {
     public boolean isSpeeding;
     public boolean isOutOfArea;
 
-    public TaxiSpeed() {}
+    public TaxiSpeed() {
+    }
 
     public TaxiSpeed(int taxiId, String timestamp, double longitude, double latitude) {
         this.taxiId = taxiId;
@@ -24,7 +25,10 @@ public class TaxiSpeed {
         this(taxiId, timestamp, longitude, latitude, speed, 0.0);
     }
 
-    public TaxiSpeed(int taxiId, String timestamp, double longitude, double latitude, double speed, double totalDistance) {
+    // TODO: remove logic and fuction calles from the models and move it to the
+    // process function, models should be pure data objects
+    public TaxiSpeed(int taxiId, String timestamp, double longitude, double latitude, double speed,
+            double totalDistance) {
         this.taxiId = taxiId;
         this.timestamp = timestamp;
         this.longitude = longitude;
@@ -39,8 +43,10 @@ public class TaxiSpeed {
     public String toString() {
         String r = String.format("Taxi %d: %.2f km/h at (%.5f, %.5f)",
                 taxiId, speed, latitude, longitude);
-        if (isSpeeding) r += " !!!Speeding!!!";
-        if (isOutOfArea) r += " !!!OutOfArea!!!";
+        if (isSpeeding)
+            r += " !!!Speeding!!!";
+        if (isOutOfArea)
+            r += " !!!OutOfArea!!!";
         return r;
     }
 }
