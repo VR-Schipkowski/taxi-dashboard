@@ -56,7 +56,7 @@ public class TaxiJob {
                                 .keyBy(location -> location.taxiId)
                                 .window(TumblingProcessingTimeWindows.of(Duration.ofSeconds(5)))
                                 .maxBy("timestamp");
-
+                // Speed calculation and alerting
                 SingleOutputStreamOperator<TaxiSpeed> speedStream = filteredLocationStream
                                 .keyBy(location -> location.taxiId)
                                 .process(new SpeedCalculatorProcessFunction());
@@ -77,8 +77,27 @@ public class TaxiJob {
                                 .build();
 
                 speedingJson.sinkTo(alertSink).name("Speeding Alerts to Kafka");
+                // Out of area detection and alerting
+                SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
+                                .keyBy(speed -> speed.taxiId)
+                                .process(new OutOfAreaProcessFunction());
+                DataStream<TaxiSpeed> outOfAreaStream = outOfAreaCheckedStream.getSideOutput(
+                                OutOfAreaProcess.OUT_OF_AREA_TAG);
 
-                speedStream.process(new SpeedRedisProcessor("redis", 6379)).name("Store Speed in Redis");
+                DataStream<String> outOfAreaJson = outOfAreaStream.map(mapper::writeValueAsString);
+
+                KafkaSink<String> alertAreaKafkaSink = KafkaSink.<String>builder()
+                                .setBootstrapServers(bootstrapServers)
+                                .setRecordSerializer(
+                                                KafkaRecordSerializationSchema.builder()
+                                                                .setTopic("taxi-out-of-area-alerts")
+                                                                .setValueSerializationSchema(new SimpleStringSchema())
+                                                                .build())
+                                .build();
+
+                outOfAreaJson.sinkTo(alertAreaKafkaSink).name("Out of Area Alerts to Kafka");
+
+                outOfAreaCheckedStream.process(new SpeedRedisProcessor("redis", 6379)).name("Store Speed in Redis");
 
                 env.execute("Taxi Fleet Monitoring");
         }
