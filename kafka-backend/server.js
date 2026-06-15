@@ -69,3 +69,50 @@ setInterval(async () => {
     console.log(`[Interval] ${taxis.length} taxis sent, total distance: ${totalDistance.toFixed(2)} km`);
 
 }, 5000);
+
+// for debug 
+const { Kafka } = require("kafkajs");
+
+const kafka = new Kafka({
+    clientId: "dashboard",
+    brokers: ["kafka:9092"],
+});
+
+const consumer = kafka.consumer({ groupId: "dashboard-debug" });
+
+const alerts = {
+    speeding: [],
+    outOfArea: []
+};
+
+async function startKafka() {
+    await consumer.connect();
+
+    await consumer.subscribe({
+        topics: ["taxi-speeding-alerts", "taxi-out-of-area-alerts"],
+        fromBeginning: true
+    });
+
+    await consumer.run({
+        eachMessage: async ({ topic, message }) => {
+            const value = message.value.toString();
+            console.log("UPDATING ALERTS:", topic, value);
+
+            if (topic === "taxi-speeding-alerts") {
+                alerts.speeding.push(value);
+                if (alerts.speeding.length > 100) alerts.speeding.shift();
+            }
+            if (topic === "taxi-out-of-area-alerts") {
+                alerts.outOfArea.push(value);
+                if (alerts.outOfArea.length > 100) alerts.outOfArea.shift();
+            }
+        }
+    });
+}
+
+startKafka().catch(console.error);
+console.log("Kafka consumer starting...");
+
+app.get("/debug/alerts", (req, res) => {
+    res.json(alerts);
+});
