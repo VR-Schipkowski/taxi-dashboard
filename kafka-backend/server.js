@@ -5,9 +5,20 @@ const Redis = require('ioredis');
 
 const app = express();
 app.use(cors());
+const redis = new Redis({ host: 'redis', port: 6379 });
+
+
+// DEBUG ENDPOINT - remove before production
+app.get('/debug', async (req, res) => {
+    const keys = await redis.keys('taxi:speed:*');
+    const result = {};
+    for (const key of keys) {
+        result[key] = await redis.hgetall(key);
+    }
+    res.json(result);
+});
 
 // Connect to Redis where Flink stores all processed taxi data
-const redis = new Redis({ host: 'redis', port: 6379 });
 const server = app.listen(5001, () => console.log('Backend running on port 5001'));
 const wss = new WebSocketServer({ server });
 

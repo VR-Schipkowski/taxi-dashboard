@@ -41,22 +41,21 @@ public class RedisSink implements Serializable {
             jedis.hset(taxiKey, "longitude", String.valueOf(speed.longitude));
             jedis.hset(taxiKey, "isSpeeding", String.valueOf(speed.isSpeeding));
             jedis.hset(taxiKey, "isOutOfArea", String.valueOf(speed.isOutOfArea));
-
+            jedis.hset(taxiKey, "averageSpeed", String.valueOf(speed.averageSpeed)); // add this
 
             // Emit an alert event when a taxi is outside the operating area so the
             // dashboard backend can pick it up without scanning every taxi hash.
             if (speed.isOutOfArea) {
                 String alert = String.format(
-                    "{\"taxi_id\":%d,\"timestamp\":\"%s\",\"latitude\":%s,\"longitude\":%s,\"type\":\"out_of_area\"}",
-                    speed.taxiId,
-                    speed.timestamp,
-                    String.valueOf(speed.latitude),
-                    String.valueOf(speed.longitude)
-                );
+                        "{\"taxi_id\":%d,\"timestamp\":\"%s\",\"latitude\":%s,\"longitude\":%s,\"type\":\"out_of_area\"}",
+                        speed.taxiId,
+                        speed.timestamp,
+                        String.valueOf(speed.latitude),
+                        String.valueOf(speed.longitude));
                 jedis.lpush("alerts:out-of-area", alert);
                 jedis.ltrim("alerts:out-of-area", 0, 199); // keep last 200 alerts
             }
-	    jedis.expire("taxi:speed:" + speed.taxiId, 60);
+            jedis.expire("taxi:speed:" + speed.taxiId, 60);
         } catch (Exception e) {
             System.err.println("Failed to store data in Redis: " + e.getMessage());
             e.printStackTrace();

@@ -85,7 +85,7 @@ function App() {
                   <strong>Average Speed:</strong> {taxi.averageSpeed?.toFixed(1)} km/h<br />
                   <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
                   {taxi.isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
-                  <strong>Distance:</strong> {taxi.totalDistance?.toFixed(2)} km<br />
+                  <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km<br />
                   {taxi.isOutOfArea ? ' ⚠️ Out of Area!' : ''}<br />
                 </div>
               </Popup>
