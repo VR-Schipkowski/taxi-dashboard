@@ -17,8 +17,8 @@ public class SpeedCalculatorProcessFunction
         private static final Logger LOG = LoggerFactory.getLogger(SpeedCalculatorProcessFunction.class);
 
         private static final double SPEEDLIMIT = 50.0;
-        private static final int WARMUP = 3;
-        private static final double MAXSPEED = 180.0; // realistic taxi limit buffer
+        private static final int WARMUP = 6;
+        private static final double MAXSPEED = 150.0; // realistic taxi limit buffer
 
         private transient ValueState<Double> avarageTaxiSpeedKmh;
         private transient ValueState<Integer> count;
