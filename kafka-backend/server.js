@@ -31,7 +31,10 @@ setInterval(async () => {
                 timestamp: data.timestamp,
                 speed: parseFloat(data.speed),
                 distance: parseFloat(data.distance),
-                isSpeeding: data.isSpeeding === 'true'
+                isSpeeding: data.isSpeeding === 'true',
+                averageSpeed: parseFloat(data.averageSpeed),
+                totalDistance: parseFloat(data.totalDistance)
+
             });
             totalDistance += parseFloat(data.distance) || 0;
         }

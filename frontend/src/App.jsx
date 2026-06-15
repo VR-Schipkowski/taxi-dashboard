@@ -82,10 +82,11 @@ function App() {
                 <div style={{ fontSize: '14px' }}>
                   <strong>Taxi ID:</strong> {taxi.taxi_id}<br />
                   <strong>Timestamp:</strong> {taxi.timestamp}<br />
+                  <strong>Average Speed:</strong> {taxi.averageSpeed?.toFixed(1)} km/h<br />
                   <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
-                    {taxi.isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
-                  <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km
-                    {taxi.isOutOfArea ? ' ⚠️ Out of Area!' : ''}<br />
+                  {taxi.isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
+                  <strong>Distance:</strong> {taxi.totalDistance?.toFixed(2)} km<br />
+                  {taxi.isOutOfArea ? ' ⚠️ Out of Area!' : ''}<br />
                 </div>
               </Popup>
             </Marker>

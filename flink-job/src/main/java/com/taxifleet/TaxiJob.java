@@ -6,9 +6,6 @@ import com.taxifleet.models.TaxiLocation;
 import com.taxifleet.models.TaxiSpeed;
 
 import java.time.Duration;
-import java.time.Instant;
-
-import org.apache.flink.api.common.eventtime.SerializableTimestampAssigner;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.serialization.*;
 import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
@@ -53,16 +50,6 @@ public class TaxiJob {
                                                 location.longitude <= 180 &&
                                                 location.latitude != 0.0 &&
                                                 location.longitude != 0.0)
-                                .assignTimestampsAndWatermarks(
-                                                WatermarkStrategy
-                                                                .<TaxiLocation>forBoundedOutOfOrderness(
-                                                                                Duration.ofSeconds(10))
-                                                                .withTimestampAssigner(
-                                                                                (SerializableTimestampAssigner<TaxiLocation>) (
-                                                                                                event,
-                                                                                                ts) -> Instant.parse(
-                                                                                                                event.timestamp)
-                                                                                                                .toEpochMilli()))
                                 .name("Parse JSON + Watermarks");
 
                 DataStream<TaxiLocation> filteredLocationStream = locationStream

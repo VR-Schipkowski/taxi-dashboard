@@ -20,8 +20,10 @@ public class SpeedCalculatorProcessFunction
         private static final int WARMUP = 3;
         private static final double MAXSPEED = 180.0; // realistic taxi limit buffer
 
+        private transient ValueState<Double> avarageTaxiSpeedKmh;
         private transient ValueState<Integer> count;
-
+        private transient ValueState<Double> totalDistanceKm;
+        private transient ValueState<Integer> speedSampleCount;
         private transient ValueState<TaxiLocation> previousLocation;
 
         @Override
@@ -31,6 +33,13 @@ public class SpeedCalculatorProcessFunction
 
                 previousLocation = getRuntimeContext().getState(descriptor);
                 count = getRuntimeContext().getState(new ValueStateDescriptor<>("init-count", Integer.class));
+                avarageTaxiSpeedKmh = getRuntimeContext()
+                                .getState(new ValueStateDescriptor<>("average-speed-kmh", Double.class));
+                totalDistanceKm = getRuntimeContext()
+                                .getState(new ValueStateDescriptor<>("total-distance-km", Double.class));
+                speedSampleCount = getRuntimeContext()
+                                .getState(new ValueStateDescriptor<>("speed-sample-count", Integer.class));
+
         }
 
         public static double speedCalc(
@@ -59,6 +68,8 @@ public class SpeedCalculatorProcessFunction
                 TaxiLocation previous = previousLocation.value();
 
                 Integer c = count.value();
+                if (avarageTaxiSpeedKmh.value() == null)
+                        avarageTaxiSpeedKmh.update(0.0);
                 if (c == null)
                         c = 0;
 
@@ -71,6 +82,7 @@ public class SpeedCalculatorProcessFunction
                                         current.timestamp,
                                         current.longitude,
                                         current.latitude,
+                                        0.0,
                                         0.0,
                                         0.0));
 
@@ -94,6 +106,7 @@ public class SpeedCalculatorProcessFunction
                                         current.longitude,
                                         current.latitude,
                                         0.0,
+                                        0.0,
                                         0.0));
                         return;
                 }
@@ -111,7 +124,7 @@ public class SpeedCalculatorProcessFunction
                                         current.longitude,
                                         current.latitude,
                                         0.0,
-                                        0.0));
+                                        0.0, 0.0));
                         return;
                 }
 
@@ -131,13 +144,30 @@ public class SpeedCalculatorProcessFunction
                                 current.longitude,
                                 current.latitude,
                                 speed,
-                                0.0);
+                                totalDistanceKm.value() == null ? 0.0 : totalDistanceKm.value(),
+                                avarageTaxiSpeedKmh.value() == null ? 0.0 : avarageTaxiSpeedKmh.value());
 
                 if (speed > SPEEDLIMIT) {
                         ctx.output(SpeedCalculatorProcess.SPEEDING_TAG, result);
                 }
 
                 out.collect(result);
+
+                // Update distance
+                double prevDist = totalDistanceKm.value() == null ? 0.0 : totalDistanceKm.value();
+                double legDist = Helper.calculateDistance(
+                                previous.latitude, previous.longitude,
+                                current.latitude, current.longitude);
+                totalDistanceKm.update(prevDist + legDist);
+
+                // Update rolling average speed
+                Integer samples = speedSampleCount.value();
+                if (samples == null)
+                        samples = 0;
+                double prevAvg = avarageTaxiSpeedKmh.value() == null ? 0.0 : avarageTaxiSpeedKmh.value();
+                double newAvg = (prevAvg * samples + speed) / (samples + 1);
+                avarageTaxiSpeedKmh.update(newAvg);
+                speedSampleCount.update(samples + 1);
 
                 // IMPORTANT: only update state after validation
                 previousLocation.update(current);
