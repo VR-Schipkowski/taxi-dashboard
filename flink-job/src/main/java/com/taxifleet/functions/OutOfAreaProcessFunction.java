@@ -21,13 +21,15 @@ public class OutOfAreaProcessFunction
             Context ctx,
             Collector<TaxiSpeed> out) throws Exception {
 
+        double MAXDISTANCE_FROM_CITY_KM = 10.0;
+
         double distance = Helper.calculateDistance(
                 current.latitude,
                 current.longitude,
                 FORBIDDEN_CITY_LATITUDE,
                 FORBIDDEN_CITY_LONGITUDE);
 
-        if (distance < 10.0) {
+        if (distance > MAXDISTANCE_FROM_CITY_KM) {
             LOG.warn(
                     "Taxi {} is out of area! Distance: {} km",
                     current.taxiId,
