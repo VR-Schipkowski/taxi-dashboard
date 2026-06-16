@@ -41,10 +41,12 @@ public class RedisSink implements Serializable {
             jedis.hset(taxiKey, "longitude", String.valueOf(speed.longitude));
             jedis.hset(taxiKey, "isSpeeding", String.valueOf(speed.isSpeeding));
             jedis.hset(taxiKey, "isOutOfArea", String.valueOf(speed.isOutOfArea));
-            jedis.hset(taxiKey, "averageSpeed", String.valueOf(speed.averageSpeed)); // add this
-
+            jedis.hset(taxiKey, "averageSpeed", String.valueOf(speed.averageSpeed));
+            jedis.hset(taxiKey, "isParking", String.valueOf(speed.isParking));
+            jedis.hset(taxiKey, "lastMoved", String.valueOf(speed.lastMoved));
             // Emit an alert event when a taxi is outside the operating area so the
             // dashboard backend can pick it up without scanning every taxi hash.
+            //TODO: not shure if still used now that the alersts are in seperate kafka chanels
             if (speed.isOutOfArea) {
                 String alert = String.format(
                         "{\"taxi_id\":%d,\"timestamp\":\"%s\",\"latitude\":%s,\"longitude\":%s,\"type\":\"out_of_area\"}",

@@ -19,12 +19,14 @@ public class SpeedCalculatorProcessFunction
         private static final double SPEEDLIMIT = 50.0;
         private static final int WARMUP = 6;
         private static final double MAXSPEED = 150.0; // realistic taxi limit buffer
+        private static final double PARKING = 300.0; // 5 minutes
 
         private transient ValueState<Double> avarageTaxiSpeedKmh;
         private transient ValueState<Integer> count;
         private transient ValueState<Double> totalDistanceKm;
         private transient ValueState<Integer> speedSampleCount;
         private transient ValueState<TaxiLocation> previousLocation;
+        private transient ValueState<String> lastMoved;
 
         @Override
         public void open(Configuration parameters) {
@@ -39,7 +41,7 @@ public class SpeedCalculatorProcessFunction
                                 .getState(new ValueStateDescriptor<>("total-distance-km", Double.class));
                 speedSampleCount = getRuntimeContext()
                                 .getState(new ValueStateDescriptor<>("speed-sample-count", Integer.class));
-
+                lastMoved = getRuntimeContext().getState(new ValueStateDescriptor<>("last-moved", String.class));
         }
 
         public static double speedCalc(
@@ -72,7 +74,10 @@ public class SpeedCalculatorProcessFunction
                         avarageTaxiSpeedKmh.update(0.0);
                 if (c == null)
                         c = 0;
-
+                if (totalDistanceKm.value() == null)
+                        totalDistanceKm.update(0.0);
+                if (lastMoved.value() == null)
+                        lastMoved.update("1897-02-02 13:33:08");
                 if (previous == null) {
                         count.update(0);
                         previousLocation.update(current);
@@ -150,6 +155,20 @@ public class SpeedCalculatorProcessFunction
                 if (speed > SPEEDLIMIT) {
                         ctx.output(SpeedCalculatorProcess.SPEEDING_TAG, result);
                 }
+                if (speed > 0.5) {
+                        lastMoved.update(current.timestamp);
+                        result.lastMoved = current.timestamp;
+                        result.isParking = false;
+                } else {
+                        String lastMovedTs = lastMoved.value();
+
+                        double parkedSeconds = Helper.calculateTimeDifferenceSeconds(lastMovedTs,
+                                        current.timestamp);
+                        if (parkedSeconds > PARKING) {
+                                result.isParking = true;
+                        }
+                        result.lastMoved = lastMovedTs;
+                }
 
                 out.collect(result);
 
@@ -165,7 +184,8 @@ public class SpeedCalculatorProcessFunction
                 if (samples == null)
                         samples = 0;
                 double prevAvg = avarageTaxiSpeedKmh.value() == null ? 0.0 : avarageTaxiSpeedKmh.value();
-                double newAvg = (prevAvg * samples + speed) / (samples + 1);
+                double newAvg = (prevAvg * samples + speed)
+                                / (samples + 1);
                 avarageTaxiSpeedKmh.update(newAvg);
                 speedSampleCount.update(samples + 1);
 

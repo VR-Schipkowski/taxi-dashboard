@@ -10,6 +10,8 @@ public class TaxiSpeed {
     public double totalDistance;
     public boolean isSpeeding;
     public boolean isOutOfArea;
+    public String lastMoved;
+    public boolean isParking;
 
     public TaxiSpeed() {
     }

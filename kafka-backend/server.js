@@ -44,8 +44,9 @@ setInterval(async () => {
                 distance: parseFloat(data.distance),
                 isSpeeding: data.isSpeeding === 'true',
                 averageSpeed: parseFloat(data.averageSpeed),
-                totalDistance: parseFloat(data.totalDistance)
-
+                totalDistance: parseFloat(data.totalDistance),
+                lastMoved: data.lastMoved && data.lastMoved !== 'null' ? data.lastMoved : '',
+                isParking: data.isParking === 'true'
             });
             totalDistance += parseFloat(data.distance) || 0;
         }
