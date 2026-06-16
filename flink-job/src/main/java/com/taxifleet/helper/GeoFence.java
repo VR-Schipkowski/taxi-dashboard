@@ -1,6 +1,7 @@
 package com.taxifleet.helper;
 
-/**
+//TODO: This class is not used in the current version of the code? MAbe it can be removed or re integrated
+/*
  * GeoFence for the taxi operating area.
  *
  * The T-Drive dataset tracks taxis in Beijing, so the default fence is a
@@ -29,7 +30,7 @@ public final class GeoFence {
      * area defined by the constants above.
      */
     public static boolean isOutOfArea(double latitude, double longitude) {
-        return latitude  < MIN_LAT || latitude  > MAX_LAT
-            || longitude < MIN_LON || longitude > MAX_LON;
+        return latitude < MIN_LAT || latitude > MAX_LAT
+                || longitude < MIN_LON || longitude > MAX_LON;
     }
 }
