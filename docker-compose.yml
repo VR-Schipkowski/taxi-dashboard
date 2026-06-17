@@ -32,26 +32,20 @@ services:
         /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic taxi-speeding --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 &&
         /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic taxi-area-violations --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
 
-  provider: &provider-base
+  provider:
     build: ./provider
     restart: on-failure
     depends_on:
       kafka-init:
         condition: service_completed_successfully
     volumes:
-      - ".provider/data/release/taxi_log_2008_by_id:/taxi-data:ro"
+      # - "./provider/data/test/taxi-data:/taxi-data:ro"
+      - "./provider/data/release/taxi_log_2008_by_id:/taxi-data:ro"
     command: --data-dir /taxi-data --bootstrap-servers kafka:9092 --speed-factor 1
     ulimits:
       nofile:
         soft: 65536
         hard: 65536
-
-  provider-test:
-    <<: *provider-base
-    profiles:
-      - test
-    volumes:
-      - ".provider/data/test/taxi-data:/taxi-data:ro"
 
   kafka-backend:
     build: ./kafka-backend
@@ -80,6 +74,11 @@ services:
     ports:
       - "8081:8081"
     command: jobmanager
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      redis-init:
+        condition: service_completed_successfully
     environment:
       FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager"
     healthcheck:
