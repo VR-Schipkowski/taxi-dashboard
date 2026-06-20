@@ -3,6 +3,9 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import './App.css';
 
+const WS_URL = import.meta.env.VITE_WS_URL
+const ws = new WebSocket(WS_URL)
+
 // Wichtig: Leaflet-CSS-Styles importieren (sonst zerreißt es die Karte)
 import 'leaflet/dist/leaflet.css';
 
@@ -28,14 +31,13 @@ const parkingIcon = L.icon({
   className: 'parking-marker',
 });
 
-
 function App() {
   const [taxis, setTaxis] = useState([]);
   const [status, setStatus] = useState('Connecting...');
 
   useEffect(() => {
     // Verbindung zum Node.js-Backend herstellen
-    const socket = new WebSocket('ws://localhost:5001');
+    const socket = new WebSocket(ws);
 
     socket.onopen = () => {
       setStatus('Connected – Live-Stream active');

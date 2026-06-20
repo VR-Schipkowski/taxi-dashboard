@@ -199,8 +199,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--data-dir",          "-d", required=True,
                    help="Directory containing the T-Drive .txt files.")
-    p.add_argument("--bootstrap-servers", "-b", default="localhost:9092",
-                   help="Kafka bootstrap servers (default: localhost:9092).")
+    p.add_argument("--bootstrap-servers", "-b", default="kafka:9092",
+                   help="Kafka bootstrap servers (default: kafka:9092).")
     p.add_argument("--topic",             "-t", default="taxi-locations",
                    help="Kafka topic name (default: taxi-locations).")
     p.add_argument("--speed-factor",      "-s", type=float, default=1.0,
