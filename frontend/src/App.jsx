@@ -3,9 +3,6 @@ import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import './App.css';
 
-const WS_URL = import.meta.env.VITE_WS_URL
-const ws = new WebSocket(WS_URL)
-
 // Wichtig: Leaflet-CSS-Styles importieren (sonst zerreißt es die Karte)
 import 'leaflet/dist/leaflet.css';
 
@@ -37,7 +34,7 @@ function App() {
 
   useEffect(() => {
     // Verbindung zum Node.js-Backend herstellen
-    const socket = new WebSocket(ws);
+    const socket = new WebSocket('ws://34.32.19.27:5001');
 
     socket.onopen = () => {
       setStatus('Connected – Live-Stream active');
