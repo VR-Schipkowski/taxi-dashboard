@@ -11,6 +11,9 @@ import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsIni
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.windowing.assigners.SlidingProcessingTimeWindows;
+import org.apache.flink.connector.kafka.sink.KafkaSink;
+import org.apache.flink.connector.kafka.sink.KafkaRecordSerializationSchema;
+
 
 import java.time.Duration;
 
@@ -60,8 +63,46 @@ public class TaxiJob {
                 ))
                 .process(new TotalDistanceSpeedCalculator())
                 .name("Total Distance Speed Calculator");
-                // Store processed results in Redis
-        speedStream.process(new SpeedRedisProcessor("redis", 6379)).name("Store Speed in Redis");
+        
+        // Convert TaxiSpeed to JSON string for all processed events
+        DataStream<String> processedJson = speedStream
+        .map(speed -> new ObjectMapper().writeValueAsString(speed))
+        .name("Serialize to JSON");
+
+        // Sink 1: all processed events
+        KafkaSink<String> processedSink = KafkaSink.<String>builder()
+        .setBootstrapServers("kafka:9092")
+        .setRecordSerializer(KafkaRecordSerializationSchema.builder()
+                .setTopic("taxi-processed")
+                .setValueSerializationSchema(new SimpleStringSchema())
+                .build())
+        .build();
+        processedJson.sinkTo(processedSink);
+
+        // Sink 2: speeding events only
+        KafkaSink<String> speedingSink = KafkaSink.<String>builder()
+        .setBootstrapServers("kafka:9092")
+        .setRecordSerializer(KafkaRecordSerializationSchema.builder()
+                .setTopic("taxi-speeding")
+                .setValueSerializationSchema(new SimpleStringSchema())
+                .build())
+        .build();
+        speedStream.filter(s -> s.isSpeeding)
+        .map(speed -> new ObjectMapper().writeValueAsString(speed))
+        .sinkTo(speedingSink);
+
+        // Sink 3: area violation events only
+        KafkaSink<String> violationsSink = KafkaSink.<String>builder()
+        .setBootstrapServers("kafka:9092")
+        .setRecordSerializer(KafkaRecordSerializationSchema.builder()
+                .setTopic("taxi-area-violations")
+                .setValueSerializationSchema(new SimpleStringSchema())
+                .build())
+        .build();
+        speedStream.filter(s -> s.isOutOfArea)
+        .map(speed -> new ObjectMapper().writeValueAsString(speed))
+        .sinkTo(violationsSink);
+
                 
         speedStream.print();
 
