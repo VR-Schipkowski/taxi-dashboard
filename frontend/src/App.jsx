@@ -5,7 +5,7 @@ import './App.css';
 import 'leaflet/dist/leaflet.css';
 import markerIconPng from 'leaflet/dist/images/marker-icon.png';
 import markerShadowPng from 'leaflet/dist/images/marker-shadow.png';
-
+// Todo: Refactor panels in seperate components
 const defaultIcon = L.icon({
   iconUrl: markerIconPng,
   shadowUrl: markerShadowPng,
