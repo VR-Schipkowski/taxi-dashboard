@@ -2,6 +2,7 @@ package com.taxifleet;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taxifleet.functions.*;
+import com.taxifleet.helper.RedisSink;
 import com.taxifleet.models.TaxiLocation;
 import com.taxifleet.models.TaxiSpeed;
 
@@ -62,7 +63,23 @@ public class TaxiJob {
 
         ObjectMapper mapper = new ObjectMapper();
 
-        // Sink 1: all processed events → taxi-processed
+        // Store Information — Flink writes every event directly to Redis (professor's topology)
+        RedisSink redisSink = new RedisSink("redis", 6379);
+        speedStream.process(new org.apache.flink.streaming.api.functions.ProcessFunction<TaxiSpeed, Void>() {
+            @Override
+            public void processElement(TaxiSpeed speed,
+                    org.apache.flink.streaming.api.functions.ProcessFunction<TaxiSpeed, Void>.Context ctx,
+                    org.apache.flink.util.Collector<Void> out) {
+                redisSink.store(speed);
+            }
+        }).name("Store Information to Redis");
+
+        // Propagate location to dashboard — throttled to one update per taxi per 5 seconds
+        DataStream<TaxiSpeed> throttledStream = speedStream
+                .keyBy(speed -> speed.taxiId)
+                .window(TumblingProcessingTimeWindows.of(Duration.ofSeconds(5)))
+                .maxBy("timestamp");
+
         KafkaSink<String> processedSink = KafkaSink.<String>builder()
                 .setBootstrapServers(bootstrapServers)
                 .setRecordSerializer(KafkaRecordSerializationSchema.builder()
@@ -70,9 +87,9 @@ public class TaxiJob {
                         .setValueSerializationSchema(new SimpleStringSchema())
                         .build())
                 .build();
-        speedStream.map(mapper::writeValueAsString).sinkTo(processedSink).name("Processed Events to Kafka");
+        throttledStream.map(mapper::writeValueAsString).sinkTo(processedSink).name("Propagate Location to Dashboard");
 
-        // Sink 2: speeding events → taxi-speeding (side output from SpeedCalculatorProcessFunction)
+        // Notify speeding — immediate, side output from SpeedCalculatorProcessFunction
         DataStream<TaxiSpeed> speedingStream = speedStream.getSideOutput(SpeedCalculatorProcess.SPEEDING_TAG);
         KafkaSink<String> speedingSink = KafkaSink.<String>builder()
                 .setBootstrapServers(bootstrapServers)
@@ -81,9 +98,9 @@ public class TaxiJob {
                         .setValueSerializationSchema(new SimpleStringSchema())
                         .build())
                 .build();
-        speedingStream.map(mapper::writeValueAsString).sinkTo(speedingSink).name("Speeding Alerts to Kafka");
+        speedingStream.map(mapper::writeValueAsString).sinkTo(speedingSink).name("Notify Speeding");
 
-        // Sink 3: area violations → taxi-area-violations (side output from OutOfAreaProcessFunction)
+        // Notify area violation — immediate, side output from OutOfAreaProcessFunction
         SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
                 .keyBy(speed -> speed.taxiId)
                 .process(new OutOfAreaProcessFunction());
@@ -95,7 +112,7 @@ public class TaxiJob {
                         .setValueSerializationSchema(new SimpleStringSchema())
                         .build())
                 .build();
-        outOfAreaStream.map(mapper::writeValueAsString).sinkTo(violationsSink).name("Out of Area Alerts to Kafka");
+        outOfAreaStream.map(mapper::writeValueAsString).sinkTo(violationsSink).name("Notify Area Violation");
 
         env.execute("Taxi Fleet Monitoring");
     }

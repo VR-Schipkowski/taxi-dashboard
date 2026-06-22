@@ -1,50 +1,31 @@
 # Kafka Contract & Architecture Overview
 
-This file explains the old and new architecture of the pipeline, the Kafka topic contracts,
-and who is responsible for what. Read this before starting any Stage 2 work.
+This file explains the architecture of the pipeline, the Kafka topic contracts,
+the WebSocket protocol, and who is responsible for what.
+Read this before starting any Stage 2 feature work.
 
 ---
 
-## Old Architecture (Stage 1)
+## Architecture (Stage 2 — Kappa)
 
 ```
-Data Provider → Kafka (taxi-locations) → Flink → Redis → Backend (polls every 5s) → WebSocket → Frontend
-```
-
-**Problems with this:**
-- Backend polls Redis every 5 seconds — not truly real-time
-- Flink writes directly to Redis — tightly coupled, hard to extend
-- Only one consumer of processed data (Redis) — nothing else can listen
-- No historical data stored anywhere
-
----
-
-## New Architecture (Stage 2)
-
-```
-Data Provider → Kafka (taxi-locations) → Flink ──→ Kafka (taxi-processed) ──→ Backend ──→ Redis (current state)
-                                               │                                      └──→ WebSocket → Frontend
-                                               └──→ Kafka (taxi-speeding)  ──→ Backend
+Data Provider → Kafka (taxi-locations) → Flink ──→ Redis (Store Information, every event)
                                                │
-                                               └──→ Kafka (taxi-area-violations) ──→ Backend
-                                               │
-                                               └──→ Kafka (taxi-processed) ──→ Database (historical data)
+                                               ├──→ Kafka (taxi-processed, throttled 5s) ──→ Backend → WebSocket → Frontend
+                                               ├──→ Kafka (taxi-speeding, immediate)     ──→ Backend → WebSocket → Frontend
+                                               └──→ Kafka (taxi-area-violations, immediate) → Backend → WebSocket → Frontend
 ```
 
-**What changed:**
-- Flink no longer writes to Redis directly — it publishes to Kafka topics only
-- Backend consumes from Kafka → writes latest state to Redis → pushes WebSocket instantly
-- Database also consumes from `taxi-processed` Kafka topic — stores every event as historical data
-- New Kafka topics carry speeding and area violation events separately
+**Key decisions:**
 
-**Why each component exists:**
-
-| Component | Role |
+| Decision | Reason |
 |---|---|
-| Kafka | Backbone — Flink publishes here, all consumers read from here |
-| Backend | Consumes Kafka events → updates Redis + pushes WebSocket to frontend |
-| Redis | Current state cache — backend reads this when a new browser connects or backend restarts |
-| Database | Historical data — consumed directly from Kafka, used for leaderboards and stats |
+| Flink writes every event to Redis | Professor's topology — "Store Information" operator |
+| `taxi-processed` is throttled to 1 update per taxi per 5s | Professor's topology — "Propagate location information every 5 seconds" |
+| `taxi-speeding` and `taxi-area-violations` are immediate | Alerts must not be delayed by the throttle window |
+| Backend does NOT write to Redis | Flink is the single writer — avoids race conditions |
+| Backend reads Redis only when a new client connects | Snapshot so the map is not empty on first load |
+| Backend broadcasts single-taxi events over WebSocket | Avoids full Redis scan on every Kafka event (OOM fix) |
 
 ---
 
@@ -53,6 +34,7 @@ Data Provider → Kafka (taxi-locations) → Flink ──→ Kafka (taxi-process
 ### `taxi-locations`
 **Producer:** Data provider
 **Consumer:** Flink
+
 Raw GPS data replayed from the T-drive dataset in timestamp order.
 
 ```json
@@ -67,11 +49,11 @@ Raw GPS data replayed from the T-drive dataset in timestamp order.
 ---
 
 ### `taxi-processed`
-**Producer:** Flink 
-**Consumers:** Backend, Database 
+**Producer:** Flink (throttled — one update per taxi per 5-second window)
+**Consumer:** Backend
 
-Published for every taxi update after speed and distance are calculated.
-This is the main data highway — all downstream consumers read from here.
+The main data stream. Published after speed, distance, and parking state are calculated.
+The 5s throttle means the latest event per taxi per window is forwarded — not every raw GPS point.
 
 ```json
 {
@@ -80,19 +62,31 @@ This is the main data highway — all downstream consumers read from here.
   "latitude": 39.9163,
   "longitude": 116.3972,
   "speed": 45.2,
+  "averageSpeed": 38.1,
   "totalDistance": 12.4,
   "isSpeeding": false,
-  "isOutOfArea": false
+  "isOutOfArea": false,
+  "isParking": false,
+  "lastMoved": "2008-02-02 13:55:00"
 }
 ```
+
+Field notes:
+- `speed` — instantaneous speed for this event (km/h)
+- `averageSpeed` — rolling average speed for this taxi (km/h)
+- `totalDistance` — cumulative distance traveled (km)
+- `isSpeeding` — true if speed > 50 km/h (Mykola's threshold)
+- `isOutOfArea` — true if outside 10 km radius of Forbidden City (Muhammad's geofence)
+- `isParking` — true if the taxi has not moved for > 300 seconds
+- `lastMoved` — timestamp of last non-parked position, empty string if never parked
 
 ---
 
 ### `taxi-speeding`
-**Producer:** Flink 
-**Consumer:** Backend 
+**Producer:** Flink (immediate — side output, bypasses 5s throttle)
+**Consumer:** Backend
 
-Published when a taxi exceeds **50 km/h**. Same fields as `taxi-processed`.
+Published the moment a taxi exceeds **60 km/h**. Same full schema as `taxi-processed`.
 
 ```json
 {
@@ -101,20 +95,23 @@ Published when a taxi exceeds **50 km/h**. Same fields as `taxi-processed`.
   "latitude": 39.9200,
   "longitude": 116.4100,
   "speed": 67.3,
+  "averageSpeed": 51.0,
   "totalDistance": 5.1,
   "isSpeeding": true,
-  "isOutOfArea": false
+  "isOutOfArea": false,
+  "isParking": false,
+  "lastMoved": ""
 }
 ```
 
 ---
 
 ### `taxi-area-violations`
-**Producer:** Flink
+**Producer:** Flink (immediate — side output, bypasses 5s throttle)
 **Consumer:** Backend
 
 Published when a taxi leaves the **10 km radius** around the Forbidden City (39.9163°N, 116.3972°E).
-Taxis beyond **15 km** are discarded from the pipeline entirely.
+Same full schema as `taxi-processed`.
 
 ```json
 {
@@ -123,29 +120,44 @@ Taxis beyond **15 km** are discarded from the pipeline entirely.
   "latitude": 40.0500,
   "longitude": 116.1200,
   "speed": 38.0,
+  "averageSpeed": 29.4,
   "totalDistance": 22.7,
   "isSpeeding": false,
-  "isOutOfArea": true
+  "isOutOfArea": true,
+  "isParking": false,
+  "lastMoved": ""
 }
 ```
 
 ---
 
-## WebSocket Payload (Frontend Contract)
+## WebSocket Protocol (Frontend Contract)
 
-The backend sends this to the React frontend every time new data arrives.
+The backend sends **one of four message types** over WebSocket.
+The frontend maintains a local map of taxis keyed by `taxi_id` and merges updates.
+
+---
+
+### `snapshot` — sent once when a new client connects
+
+Full current state read from Redis. Use this to populate the initial map.
 
 ```json
 {
+  "type": "snapshot",
   "taxis": [
     {
       "taxi_id": "31",
       "latitude": 39.9163,
       "longitude": 116.3972,
       "speed": 45.2,
+      "averageSpeed": 38.1,
       "distance": 12.4,
+      "totalDistance": 12.4,
       "timestamp": "2008-02-02 13:59:00",
-      "isSpeeding": false
+      "isSpeeding": false,
+      "isParking": false,
+      "lastMoved": ""
     }
   ],
   "stats": {
@@ -163,14 +175,101 @@ The backend sends this to the React frontend every time new data arrives.
 
 ---
 
-## Redis Role After Refactor
+### `taxiUpdate` — sent every ~5 seconds per taxi
 
-Redis is **kept** but its writer changes — `SpeedRedisProcessor.java` in Flink is replaced. The backend now writes to Redis after consuming from Kafka.
+Single taxi update from `taxi-processed`. Update (or insert) this taxi in your local map by `taxi_id`.
 
-| Scenario | Data source |
+```json
+{
+  "type": "taxiUpdate",
+  "taxi": {
+    "taxi_id": "31",
+    "latitude": 39.9163,
+    "longitude": 116.3972,
+    "speed": 45.2,
+    "averageSpeed": 38.1,
+    "distance": 12.4,
+    "totalDistance": 12.4,
+    "timestamp": "2008-02-02 13:59:00",
+    "isSpeeding": false,
+    "isParking": false,
+    "lastMoved": ""
+  }
+}
+```
+
+---
+
+### `speedingAlert` — sent immediately when a speeding event is detected
+
+Use `incident` for the new event. Use `speedingIncidents` to replace the full list in the UI.
+
+```json
+{
+  "type": "speedingAlert",
+  "incident": {
+    "taxiId": 42,
+    "speed": 67.3,
+    "timestamp": "2008-02-02 14:01:00"
+  },
+  "speedingIncidents": [
+    { "taxiId": 42, "speed": 67.3, "timestamp": "2008-02-02 14:01:00" }
+  ]
+}
+```
+
+---
+
+### `areaViolation` — sent immediately when a taxi leaves the geofence
+
+Use `violation` for the new event. Use `areaViolations` to replace the full list in the UI.
+
+```json
+{
+  "type": "areaViolation",
+  "violation": {
+    "taxiId": 815,
+    "timestamp": "2008-02-02 14:05:00"
+  },
+  "areaViolations": [
+    { "taxiId": 815, "timestamp": "2008-02-02 14:05:00" }
+  ]
+}
+```
+
+---
+
+## Frontend Field Guide
+
+| Field | Source message | Use for |
+|---|---|---|
+| `taxi.taxi_id` | snapshot, taxiUpdate | Map key, display ID |
+| `taxi.latitude` / `taxi.longitude` | snapshot, taxiUpdate | Leaflet Marker position |
+| `taxi.speed` | snapshot, taxiUpdate | Current speed display |
+| `taxi.averageSpeed` | snapshot, taxiUpdate | Average speed display |
+| `taxi.totalDistance` | snapshot, taxiUpdate | Total distance display |
+| `taxi.isSpeeding` | snapshot, taxiUpdate | Speeding marker color |
+| `taxi.isParking` | snapshot, taxiUpdate | Parking marker icon |
+| `taxi.isOutOfArea` | snapshot | Area violation marker (not in taxiUpdate) |
+| `speedingIncidents[]` | snapshot, speedingAlert | Speeding panel list |
+| `areaViolations[]` | snapshot, areaViolation | Area violation panel list |
+
+---
+
+## Redis Role
+
+Flink is the **only writer**. The backend only reads Redis.
+
+| Scenario | What happens |
 |---|---|
-| Live updates for connected clients | Kafka → Backend → WebSocket (instant) |
-| New browser connects / backend restarts | Backend reads Redis snapshot → sends full current state immediately |
-| Historical data / leaderboards | Database (consumed directly from Kafka) |
+| Live update for connected clients | Kafka → Backend → WebSocket (instant, no Redis involved) |
+| New browser connects | Backend reads all `taxi:speed:*` keys from Redis → sends `snapshot` |
+| Backend restarts | Same as above — Redis is the recovery point |
 
-Without Redis, a new browser would see an empty map and wait for taxis to appear one by one as Kafka events trickle in. Redis gives new clients the full picture immediately.
+Redis keys expire after **60 seconds**. A taxi that stops sending GPS events disappears from the map naturally.
+
+Key format: `taxi:speed:<taxiId>` (Redis hash)
+
+Fields stored per taxi: `latitude`, `longitude`, `speed`, `averageSpeed`, `distance`, `totalDistance`, `timestamp`, `isSpeeding`, `isOutOfArea`, `isParking`, `lastMoved`
+
+---

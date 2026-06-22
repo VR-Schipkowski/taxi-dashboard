@@ -30,11 +30,12 @@ const parkingIcon = L.icon({
 
 
 function App() {
-  const [taxis, setTaxis] = useState([]);
+  const [taxiMap, setTaxiMap] = useState({});
+  const [speedingIncidents, setSpeedingIncidents] = useState([]);
+  const [areaViolations, setAreaViolations] = useState([]);
   const [status, setStatus] = useState('Connecting...');
 
   useEffect(() => {
-    // Verbindung zum Node.js-Backend herstellen
     const socket = new WebSocket('ws://localhost:5001');
 
     socket.onopen = () => {
@@ -43,9 +44,25 @@ function App() {
 
     socket.onmessage = (event) => {
       try {
-        // backend sends taxi object every 5 seconds
-        const payload = JSON.parse(event.data);
-        setTaxis(payload.taxis || []);
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'snapshot') {
+          const map = {};
+          (data.taxis || []).forEach(t => { map[t.taxi_id] = t; });
+          setTaxiMap(map);
+          setSpeedingIncidents(data.speedingIncidents || []);
+          setAreaViolations(data.areaViolations || []);
+
+        } else if (data.type === 'taxiUpdate') {
+          setTaxiMap(prev => ({ ...prev, [data.taxi.taxi_id]: data.taxi }));
+
+        } else if (data.type === 'speedingAlert') {
+          setSpeedingIncidents(data.speedingIncidents || []);
+
+        } else if (data.type === 'areaViolation') {
+          setAreaViolations(data.areaViolations || []);
+        }
+
       } catch (error) {
         console.error("Error parsing the WebSocket data:", error);
       }
@@ -57,6 +74,8 @@ function App() {
 
     return () => socket.close();
   }, []);
+
+  const taxis = Object.values(taxiMap);
 
   return (
     <div style={{ padding: '20px', fontFamily: 'sans-serif', height: '100vh', display: 'flex', flexDirection: 'column' }}>

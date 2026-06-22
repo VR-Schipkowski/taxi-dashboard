@@ -33,7 +33,8 @@ function broadcast(payload) {
     });
 }
 
-async function buildCurrentState() {
+// Read full state from Redis — only called when a new client connects
+async function buildSnapshot() {
     const keys = await redis.keys('taxi:speed:*');
     const taxis = [];
     let totalDistance = 0;
@@ -59,10 +60,11 @@ async function buildCurrentState() {
     return { taxis, totalDistance };
 }
 
-// Send full current state to a newly connected client
+// New client connects — send full snapshot from Redis so map is not empty
 wss.on('connection', async (ws) => {
-    const { taxis, totalDistance } = await buildCurrentState();
+    const { taxis, totalDistance } = await buildSnapshot();
     ws.send(JSON.stringify({
+        type: 'snapshot',
         taxis,
         stats: { activeTaxiCount: taxis.length, totalDistance },
         speedingIncidents,
@@ -71,40 +73,33 @@ wss.on('connection', async (ws) => {
 });
 
 async function startConsumers() {
-    // Consumer for taxi-processed
+    // Consumer for taxi-processed — broadcast single taxi update, no Redis scan
     const processedConsumer = kafka.consumer({ groupId: 'backend-processed' });
     await processedConsumer.connect();
     await processedConsumer.subscribe({ topic: 'taxi-processed', fromBeginning: false });
     await processedConsumer.run({
         eachMessage: async ({ message }) => {
             const event = JSON.parse(message.value.toString());
-
-            // Write latest state to Redis (replaces Flink's RedisSink)
-            await redis.hset(`taxi:speed:${event.taxiId}`,
-                'latitude', event.latitude,
-                'longitude', event.longitude,
-                'speed', event.speed,
-                'distance', event.totalDistance,
-                'timestamp', event.timestamp,
-                'isSpeeding', event.isSpeeding,
-                'averageSpeed', event.averageSpeed,
-                'totalDistance', event.totalDistance,
-                'lastMoved', event.lastMoved ?? '',
-                'isParking', event.isParking ?? false
-            );
-
-            // Broadcast immediately to all clients
-            const { taxis, totalDistance } = await buildCurrentState();
             broadcast({
-                taxis,
-                stats: { activeTaxiCount: taxis.length, totalDistance },
-                speedingIncidents,
-                areaViolations
+                type: 'taxiUpdate',
+                taxi: {
+                    taxi_id: String(event.taxiId),
+                    latitude: event.latitude,
+                    longitude: event.longitude,
+                    speed: event.speed,
+                    distance: event.totalDistance,
+                    timestamp: event.timestamp,
+                    isSpeeding: event.isSpeeding,
+                    averageSpeed: event.averageSpeed,
+                    totalDistance: event.totalDistance,
+                    lastMoved: event.lastMoved ?? '',
+                    isParking: event.isParking ?? false
+                }
             });
         }
     });
 
-    // Consumer for taxi-speeding
+    // Consumer for taxi-speeding — immediate alert broadcast
     const speedingConsumer = kafka.consumer({ groupId: 'backend-speeding' });
     await speedingConsumer.connect();
     await speedingConsumer.subscribe({ topic: 'taxi-speeding', fromBeginning: false });
@@ -112,18 +107,15 @@ async function startConsumers() {
         eachMessage: async ({ message }) => {
             const event = JSON.parse(message.value.toString());
             speedingIncidents.push({ taxiId: event.taxiId, speed: event.speed, timestamp: event.timestamp });
-
-            const { taxis, totalDistance } = await buildCurrentState();
             broadcast({
-                taxis,
-                stats: { activeTaxiCount: taxis.length, totalDistance },
-                speedingIncidents,
-                areaViolations
+                type: 'speedingAlert',
+                incident: { taxiId: event.taxiId, speed: event.speed, timestamp: event.timestamp },
+                speedingIncidents
             });
         }
     });
 
-    // Consumer for taxi-area-violations
+    // Consumer for taxi-area-violations — immediate alert broadcast
     const violationsConsumer = kafka.consumer({ groupId: 'backend-violations' });
     await violationsConsumer.connect();
     await violationsConsumer.subscribe({ topic: 'taxi-area-violations', fromBeginning: false });
@@ -131,12 +123,9 @@ async function startConsumers() {
         eachMessage: async ({ message }) => {
             const event = JSON.parse(message.value.toString());
             areaViolations.push({ taxiId: event.taxiId, timestamp: event.timestamp });
-
-            const { taxis, totalDistance } = await buildCurrentState();
             broadcast({
-                taxis,
-                stats: { activeTaxiCount: taxis.length, totalDistance },
-                speedingIncidents,
+                type: 'areaViolation',
+                violation: { taxiId: event.taxiId, timestamp: event.timestamp },
                 areaViolations
             });
         }
