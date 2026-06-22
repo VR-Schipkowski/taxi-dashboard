@@ -27,10 +27,7 @@ services:
       - /bin/sh
       - -c
       - >-
-        /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic taxi-locations --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 &&
-        /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic taxi-processed --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 &&
-        /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic taxi-speeding --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 &&
-        /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic taxi-area-violations --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic taxi-locations --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 && /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic taxi-processed --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 && /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic taxi-speeding --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1 && /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --topic taxi-area-violations --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
 
   provider:
     build: ./provider
@@ -39,8 +36,8 @@ services:
       kafka-init:
         condition: service_completed_successfully
     volumes:
-      - "./provider/data/test/taxi-data:/taxi-data:ro"
-      #- "./provider/data/release/taxi_log_2008_by_id:/taxi-data:ro"
+      #- "./provider/data/test/taxi-data:/taxi-data:ro"
+      - "./provider/data/release/taxi_log_2008_by_id:/taxi-data:ro"
     command: --data-dir /taxi-data --bootstrap-servers kafka:9092 --speed-factor 1
     ulimits:
       nofile:
