@@ -125,6 +125,14 @@ norma_out_of_area = generate_circle_taxi(
     center_lon=CENTER_LON,
     radius_m=13000
 )
+norma_out_of_area2 = generate_circle_taxi(
+    taxi_id=10006,
+    speed_kmh=45,
+    duration_minutes=30,
+    center_lat=CENTER_LAT,  # ca. 11 km nördlich
+    center_lon=CENTER_LON,
+    radius_m=21000
+)
 
 write_taxi_file("taxi_parked.txt", parked)
 write_taxi_file("taxi_45.txt", normal)
@@ -132,3 +140,4 @@ write_taxi_file("taxi_65.txt", speeding)
 write_taxi_file("taxi_120.txt", speedingfaster)    
 write_taxi_file("taxi_200.txt", speedingfastest)
 write_taxi_file("taxi_45_out_of_area.txt", norma_out_of_area)
+write_taxi_file("taxi_45_out_of_area2.txt", norma_out_of_area2) 
