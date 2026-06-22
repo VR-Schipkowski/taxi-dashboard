@@ -23,13 +23,22 @@ const parkingIcon = L.icon({
   className: 'parking-marker',
 });
 
+const selectedIcon = L.icon({
+  iconUrl: markerIconPng,
+  shadowUrl: markerShadowPng,
+  iconSize: [32, 52],
+  iconAnchor: [16, 52],
+  popupAnchor: [1, -44],
+  className: 'selected-marker',
+});
+
 const TAG_STYLES = {
   speeding: { bg: '#FAECE7', color: '#993C1D', dot: '#D85A30' },
   area: { bg: '#FAEEDA', color: '#854F0B', dot: '#BA7517' },
   taxiUpdate: { bg: '#E6F1FB', color: '#185FA5', dot: '#378ADD' },
 };
 
-function DebugAlerts({ entries, counts, filters, onToggleFilter, onClear }) {
+function DebugAlerts({ entries, counts, filters, onToggleFilter, onClear, selectedTaxiId, onSelectTaxi }) {
   const logRef = useRef(null);
 
   useEffect(() => {
@@ -52,7 +61,7 @@ function DebugAlerts({ entries, counts, filters, onToggleFilter, onClear }) {
       {/* Header */}
       <div style={{ padding: '10px 12px', borderBottom: '1px solid #e5e7eb' }}>
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: '#111' }}>
-          🐞 Debug Alerts
+          Alerts
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {['speeding', 'area', 'taxiUpdate'].map(type => {
@@ -104,11 +113,19 @@ function DebugAlerts({ entries, counts, filters, onToggleFilter, onClear }) {
         ) : (
           visible.map((entry, i) => {
             const s = TAG_STYLES[entry.type];
+            const clickable = entry.taxiId !== null && entry.taxiId !== undefined;
+            const selected = clickable && String(entry.taxiId) === String(selectedTaxiId);
             return (
-              <div key={i} style={{
-                display: 'flex', gap: 8, padding: '5px 12px',
-                borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start',
-              }}>
+              <div
+                key={i}
+                onClick={() => clickable && onSelectTaxi(entry.taxiId)}
+                style={{
+                  display: 'flex', gap: 8, padding: '5px 12px',
+                  borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start',
+                  cursor: clickable ? 'pointer' : 'default',
+                  background: selected ? '#EFF6FF' : 'transparent',
+                }}
+              >
                 <div style={{
                   width: 7, height: 7, borderRadius: '50%',
                   background: s.dot, marginTop: 4, flexShrink: 0,
@@ -139,17 +156,17 @@ function App() {
   const [speedingIncidents, setSpeedingIncidents] = useState([]);
   const [areaViolations, setAreaViolations] = useState([]);
   const [status, setStatus] = useState('Connecting...');
-  const [showDebug, setShowDebug] = useState(true);
+  const [selectedTaxiId, setSelectedTaxiId] = useState(null);
 
   // Debug alerts state
   const [debugEntries, setDebugEntries] = useState([]);
   const [debugCounts, setDebugCounts] = useState({ speeding: 0, area: 0, taxiUpdate: 0 });
   const [debugFilters, setDebugFilters] = useState({ speeding: true, area: true, taxiUpdate: true });
 
-  function addDebugEntry(type, text) {
+  function addDebugEntry(type, text, taxiId = null) {
     const now = new Date();
     const ts = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
-    setDebugEntries(prev => [{ type, text, ts }, ...prev].slice(0, 300));
+    setDebugEntries(prev => [{ type, text, ts, taxiId }, ...prev].slice(0, 300));
     setDebugCounts(prev => ({ ...prev, [type]: prev[type] + 1 }));
   }
 
@@ -160,6 +177,10 @@ function App() {
   function clearDebug() {
     setDebugEntries([]);
     setDebugCounts({ speeding: 0, area: 0, taxiUpdate: 0 });
+  }
+
+  function selectTaxiFromAlert(taxiId) {
+    setSelectedTaxiId(prev => (String(prev) === String(taxiId) ? null : taxiId));
   }
 
   useEffect(() => {
@@ -184,18 +205,19 @@ function App() {
           setTaxiMap(prev => ({ ...prev, [t.taxi_id]: t }));
           addDebugEntry(
             'taxiUpdate',
-            `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? ' ⚡' : ''}${t.isParking ? ' 🅿' : ''}`
+            `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? ' ⚡' : ''}${t.isParking ? ' 🅿' : ''}`,
+            t.taxi_id
           );
 
         } else if (data.type === 'speedingAlert') {
           const i = data.incident;
           setSpeedingIncidents(data.speedingIncidents || []);
-          addDebugEntry('speeding', `taxi ${i.taxiId} — ${i.speed.toFixed(1)} km/h`);
+          addDebugEntry('speeding', `taxi ${i.taxiId} — ${i.speed.toFixed(1)} km/h`, i.taxiId);
 
         } else if (data.type === 'areaViolation') {
           const v = data.violation;
           setAreaViolations(data.areaViolations || []);
-          addDebugEntry('area', `taxi ${v.taxiId} outside permitted area`);
+          addDebugEntry('area', `taxi ${v.taxiId} outside permitted area`, v.taxiId);
         }
 
       } catch (error) {
@@ -208,7 +230,10 @@ function App() {
     return () => socket.close();
   }, []);
 
-  const taxis = Object.values(taxiMap);
+  const allTaxis = Object.values(taxiMap);
+  const taxis = selectedTaxiId === null
+    ? allTaxis
+    : allTaxis.filter(t => String(t.taxi_id) === String(selectedTaxiId));
   const isConnected = status.includes('active') || status.includes('aktiv');
 
   return (
@@ -225,8 +250,13 @@ function App() {
           <span style={{ color: isConnected ? '#16a34a' : '#dc2626' }}>{status}</span>
         </span>
         <span style={{ fontSize: 13, color: '#555' }}>
-          <strong>Active:</strong> {taxis.length}
+          <strong>Active:</strong> {allTaxis.length}
         </span>
+        {selectedTaxiId !== null && (
+          <span style={{ fontSize: 12, background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
+            focused taxi: {selectedTaxiId}
+          </span>
+        )}
         {speedingIncidents.length > 0 && (
           <span style={{
             fontSize: 12, background: '#FAECE7', color: '#993C1D',
@@ -243,17 +273,7 @@ function App() {
             🗺️ {areaViolations.length} area violations
           </span>
         )}
-        <button
-          onClick={() => setShowDebug(p => !p)}
-          style={{
-            marginLeft: 'auto', fontSize: 12, padding: '4px 10px',
-            border: '1px solid #d1d5db', borderRadius: 6,
-            background: showDebug ? '#f0f4ff' : 'transparent',
-            cursor: 'pointer', color: showDebug ? '#2563eb' : '#555',
-          }}
-        >
-          {showDebug ? '🐞 hide debug' : '🐞 show debug'}
-        </button>
+
       </header>
 
       {/* Main content */}
@@ -273,7 +293,9 @@ function App() {
               <Marker
                 key={taxi.taxi_id}
                 position={[taxi.latitude, taxi.longitude]}
-                icon={taxi.isParking ? parkingIcon : defaultIcon}
+                icon={selectedTaxiId !== null && String(taxi.taxi_id) === String(selectedTaxiId)
+                  ? selectedIcon
+                  : (taxi.isParking ? parkingIcon : defaultIcon)}
               >
                 <Popup>
                   <div style={{ fontSize: 14 }}>
@@ -292,15 +314,15 @@ function App() {
         </div>
 
         {/* Debug panel */}
-        {showDebug && (
-          <DebugAlerts
-            entries={debugEntries}
-            counts={debugCounts}
-            filters={debugFilters}
-            onToggleFilter={toggleFilter}
-            onClear={clearDebug}
-          />
-        )}
+        <DebugAlerts
+          entries={debugEntries}
+          counts={debugCounts}
+          filters={debugFilters}
+          onToggleFilter={toggleFilter}
+          onClear={clearDebug}
+          selectedTaxiId={selectedTaxiId}
+          onSelectTaxi={selectTaxiFromAlert}
+        />
       </div>
     </div>
   );
