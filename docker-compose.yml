@@ -76,7 +76,7 @@ services:
     environment:
       FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8081" ]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -104,13 +104,7 @@ services:
       kafka-init:
         condition: service_completed_successfully
     command: >
-      bash -c "
-      sleep 10 &&
-      /opt/flink/bin/flink run
-      --jobmanager flink-jobmanager:8081
-      --detached
-      /opt/flink/usrlib/taxi-processor-1.0.jar
-      "
+      bash -c " sleep 10 && /opt/flink/bin/flink run --jobmanager flink-jobmanager:8081 --detached /opt/flink/usrlib/taxi-processor-1.0.jar "
 
   redis:
     image: redis:7.2
@@ -119,15 +113,15 @@ services:
       - "6379:6379"
     command: redis-server --save "" --appendonly no
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 5
-  
+
   redis-init:
     image: redis:7.2
     depends_on:
       redis:
         condition: service_healthy
-    entrypoint: ["redis-cli", "-h", "redis", "FLUSHALL"]
+    entrypoint: [ "redis-cli", "-h", "redis", "FLUSHALL" ]
     restart: "no"

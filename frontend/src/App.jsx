@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
+import './App.css';
 
 // Wichtig: Leaflet-CSS-Styles importieren (sonst zerreißt es die Karte)
 import 'leaflet/dist/leaflet.css';
@@ -16,6 +17,15 @@ const defaultIcon = L.icon({
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
+});
+
+const parkingIcon = L.icon({
+  iconUrl: markerIconPng,
+  shadowUrl: markerShadowPng,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  className: 'parking-marker',
 });
 
 
@@ -76,16 +86,17 @@ function App() {
             <Marker
               key={taxi.taxi_id}
               position={[taxi.latitude, taxi.longitude]}
-              icon={defaultIcon}
+              icon={taxi.isParking ? parkingIcon : defaultIcon}
             >
               <Popup>
                 <div style={{ fontSize: '14px' }}>
                   <strong>Taxi ID:</strong> {taxi.taxi_id}<br />
                   <strong>Timestamp:</strong> {taxi.timestamp}<br />
+                  <strong>Average Speed:</strong> {taxi.averageSpeed?.toFixed(1)} km/h<br />
                   <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
-                    {taxi.isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
-                  <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km
-                    {taxi.isOutOfArea ? ' ⚠️ Out of Area!' : ''}<br />
+                  {taxi.isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
+                  <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km<br />
+                  {taxi.isOutOfArea ? ' ⚠️ Out of Area!' : ''}<br />
                 </div>
               </Popup>
             </Marker>

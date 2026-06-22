@@ -16,6 +16,16 @@ const kafka = new Kafka({ brokers: ['kafka:9092'] });
 const speedingIncidents = [];
 const areaViolations = [];
 
+// DEBUG ENDPOINT - remove before production
+app.get('/debug', async (req, res) => {
+    const keys = await redis.keys('taxi:speed:*');
+    const result = {};
+    for (const key of keys) {
+        result[key] = await redis.hgetall(key);
+    }
+    res.json(result);
+});
+
 function broadcast(payload) {
     const msg = JSON.stringify(payload);
     wss.clients.forEach(client => {
@@ -37,7 +47,11 @@ async function buildCurrentState() {
                 speed: parseFloat(data.speed),
                 distance: parseFloat(data.distance),
                 timestamp: data.timestamp,
-                isSpeeding: data.isSpeeding === 'true'
+                isSpeeding: data.isSpeeding === 'true',
+                averageSpeed: parseFloat(data.averageSpeed),
+                totalDistance: parseFloat(data.totalDistance),
+                lastMoved: data.lastMoved && data.lastMoved !== 'null' ? data.lastMoved : '',
+                isParking: data.isParking === 'true'
             });
             totalDistance += parseFloat(data.distance) || 0;
         }
@@ -45,7 +59,7 @@ async function buildCurrentState() {
     return { taxis, totalDistance };
 }
 
-// Send full current state to a newly connected client (Catch-up snapshot)
+// Send full current state to a newly connected client
 wss.on('connection', async (ws) => {
     const { taxis, totalDistance } = await buildCurrentState();
     ws.send(JSON.stringify({
@@ -72,7 +86,11 @@ async function startConsumers() {
                 'speed', event.speed,
                 'distance', event.totalDistance,
                 'timestamp', event.timestamp,
-                'isSpeeding', event.isSpeeding
+                'isSpeeding', event.isSpeeding,
+                'averageSpeed', event.averageSpeed,
+                'totalDistance', event.totalDistance,
+                'lastMoved', event.lastMoved ?? '',
+                'isParking', event.isParking ?? false
             );
 
             // Broadcast immediately to all clients
