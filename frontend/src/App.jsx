@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import './App.css';
 import 'leaflet/dist/leaflet.css';
@@ -37,6 +37,20 @@ const TAG_STYLES = {
   area: { bg: '#FAEEDA', color: '#854F0B', dot: '#BA7517' },
   taxiUpdate: { bg: '#E6F1FB', color: '#185FA5', dot: '#378ADD' },
 };
+
+function RecenterMap({ selectedTaxi }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!selectedTaxi) return;
+
+    map.setView([selectedTaxi.latitude, selectedTaxi.longitude], map.getZoom(), {
+      animate: true,
+    });
+  }, [map, selectedTaxi]);
+
+  return null;
+}
 
 function DebugAlerts({ entries, counts, filters, onToggleFilter, onClear, selectedTaxiId, onSelectTaxi }) {
   const logRef = useRef(null);
@@ -285,6 +299,7 @@ function App() {
             zoom={12}
             style={{ height: '100%', width: '100%' }}
           >
+            <RecenterMap selectedTaxi={selectedTaxiId === null ? null : taxiMap[selectedTaxiId]} />
             <TileLayer
               attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
