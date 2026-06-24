@@ -38,7 +38,7 @@ const TAG_STYLES = {
   taxiUpdate: { bg: '#E6F1FB', color: '#185FA5', dot: '#378ADD' },
 };
 
-const STALE_AFTER_MS = 5 * 60 * 1000;
+const STALE_AFTER_MS = 30 * 1000;
 
 function getOpacity(lastSeenTime, now) {
   if (!lastSeenTime) return 1;
@@ -216,7 +216,7 @@ function App() {
 
   useEffect(() => {
     // const socket = new WebSocket('ws://localhost:5001');
-    const socket = new WebSocket('ws://34.32.19.27:5001');
+    const socket = new WebSocket('ws://34.28.224.202:5001');
 
     socket.onopen = () => setStatus('Connected – Live-Stream active');
 
@@ -291,7 +291,7 @@ function App() {
           <span style={{color: isConnected ? '#16a34a' : '#dc2626'}}>{status}</span>
         </span>
         <span style={{fontSize: 13, color: '#555'}}>
-          <strong>Active:</strong> {allTaxis.length}
+          <strong>Active:</strong> {visibleTaxis.length}
         </span>
         {selectedTaxiId !== null && (
           <span style={{ fontSize: 12, background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
