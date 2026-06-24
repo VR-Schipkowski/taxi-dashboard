@@ -13,9 +13,28 @@ const wss = new WebSocketServer({ server });
 
 const kafka = new Kafka({ brokers: ['kafka:9092'] });
 
-const speedingIncidents = [];
-const areaViolations = [];
+const ALARM_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+const speedingIncidents = new Map(); // taxiId -> incident
+const areaViolations = new Map();    // taxiId -> violation
+
+function pruneExpired(map, ttl) {
+    const cutoff = Date.now() - ttl;
+    let changed = false;
+    for (const [taxiId, entry] of map) {
+        if (entry.receivedAt < cutoff) {
+            map.delete(taxiId);
+            changed = true;
+        }
+    }
+    return changed;
+}
+setInterval(() => {
+    const speedingChanged = pruneExpired(speedingIncidents, ALARM_TTL_MS);
+    const violationsChanged = pruneExpired(areaViolations, ALARM_TTL_MS);
+    if (speedingChanged) broadcast({ type: 'alarmsSync', kind: 'speeding', speedingIncidents: Array.from(speedingIncidents.values()) });
+    if (violationsChanged) broadcast({ type: 'alarmsSync', kind: 'area', areaViolations: Array.from(areaViolations.values()) });
+}, 30_000);
 // DEBUG ENDPOINT - remove before production
 app.get('/debug', async (req, res) => {
     const keys = await redis.keys('taxi:speed:*');
@@ -67,8 +86,8 @@ wss.on('connection', async (ws) => {
         type: 'snapshot',
         taxis,
         stats: { activeTaxiCount: taxis.length, totalDistance },
-        speedingIncidents,
-        areaViolations
+        speedingIncidents: Array.from(speedingIncidents.values()),
+        areaViolations: Array.from(areaViolations.values())
     }));
 });
 
@@ -106,11 +125,12 @@ async function startConsumers() {
     await speedingConsumer.run({
         eachMessage: async ({ message }) => {
             const event = JSON.parse(message.value.toString());
-            speedingIncidents.push({ taxiId: event.taxiId, speed: event.speed, timestamp: event.timestamp });
+            const incident = { taxiId: event.taxiId, speed: event.speed, timestamp: event.timestamp, receivedAt: Date.now() };
+            speedingIncidents.set(event.taxiId, incident);
             broadcast({
                 type: 'speedingAlert',
-                incident: { taxiId: event.taxiId, speed: event.speed, timestamp: event.timestamp },
-                speedingIncidents
+                incident,
+                speedingIncidents: Array.from(speedingIncidents.values())
             });
         }
     });
@@ -122,11 +142,16 @@ async function startConsumers() {
     await violationsConsumer.run({
         eachMessage: async ({ message }) => {
             const event = JSON.parse(message.value.toString());
-            areaViolations.push({ taxiId: event.taxiId, timestamp: event.timestamp });
+            const violation = {
+                taxiId: event.taxiId,
+                timestamp: event.timestamp,
+                receivedAt: Date.now()
+            };
+            areaViolations.set(event.taxiId, violation);
             broadcast({
                 type: 'areaViolation',
-                violation: { taxiId: event.taxiId, timestamp: event.timestamp },
-                areaViolations
+                violation,
+                areaViolations: Array.from(areaViolations.values())
             });
         }
     });
