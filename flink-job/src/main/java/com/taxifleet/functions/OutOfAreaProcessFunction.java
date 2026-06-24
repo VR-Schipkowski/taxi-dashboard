@@ -21,7 +21,7 @@ public class OutOfAreaProcessFunction
             Context ctx,
             Collector<TaxiSpeed> out) throws Exception {
 
-        double MAXDISTANCE_FROM_CITY_KM = 10.0;
+        double MAXDISTANCE_FROM_CITY_KM = 15.0;
 
         double distance = Helper.calculateDistance(
                 current.latitude,
