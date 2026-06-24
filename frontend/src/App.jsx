@@ -215,7 +215,8 @@ function App() {
   }
 
   useEffect(() => {
-    const socket = new WebSocket('ws://localhost:5001');
+    // const socket = new WebSocket('ws://localhost:5001');
+    const socket = new WebSocket('ws://34.32.19.27:5001');
 
     socket.onopen = () => setStatus('Connected – Live-Stream active');
 
