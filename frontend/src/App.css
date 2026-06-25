@@ -219,3 +219,13 @@
 .leaflet-marker-shadow {
   transition: opacity 1s linear;
 }
+
+.leaflet-marker-icon.speeding-marker {
+  filter: hue-rotate(150deg) saturate(6) brightness(0.9);
+  opacity: 1;
+}
+
+.leaflet-marker-icon.area-marker {
+  filter: hue-rotate(230deg) saturate(6) brightness(1);
+  opacity: 1;
+}

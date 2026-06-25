@@ -14,6 +14,24 @@ const defaultIcon = L.icon({
   popupAnchor: [1, -34],
 });
 
+const speedingIcon = L.icon({
+  iconUrl: markerIconPng,
+  shadowUrl: markerShadowPng,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  className: 'speeding-marker',
+});
+
+const ooaIcon = L.icon({
+  iconUrl: markerIconPng,
+  shadowUrl: markerShadowPng,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  className: 'area-marker',
+});
+
 const parkingIcon = L.icon({
   iconUrl: markerIconPng,
   shadowUrl: markerShadowPng,
@@ -268,6 +286,8 @@ function App() {
 
   const allTaxis = Object.values(taxiMap);
 
+  const violatingTaxiIds = new Set(areaViolations.map(v => String(v.taxiId)));
+
   const visibleTaxis = allTaxis
       .map(t => ({ ...t, _opacity: getOpacity(lastSeen[t.taxi_id], now) }))
       .filter(t => t._opacity > 0);
@@ -331,28 +351,44 @@ function App() {
               attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {taxis.map((taxi) => (
-              <Marker
-                key={taxi.taxi_id}
-                position={[taxi.latitude, taxi.longitude]}
-                opacity={taxi._opacity}
-                icon={selectedTaxiId !== null && String(taxi.taxi_id) === String(selectedTaxiId)
-                  ? selectedIcon
-                  : (taxi.isParking ? parkingIcon : defaultIcon)}
-              >
-                <Popup>
-                  <div style={{ fontSize: 14 }}>
-                    <strong>Taxi ID:</strong> {taxi.taxi_id}<br />
-                    <strong>Timestamp:</strong> {taxi.timestamp}<br />
-                    <strong>Average Speed:</strong> {taxi.averageSpeed?.toFixed(1)} km/h<br />
-                    <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
-                    {taxi.isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
-                    <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km<br />
-                    {taxi.isOutOfArea ? ' ⚠️ Out of Area!' : ''}
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
+            {taxis.map((taxi) => {
+              const isSpeeding = taxi.isSpeeding;
+              const isOutOfArea = violatingTaxiIds.has(String(taxi.taxi_id));
+
+              let icon;
+              if (selectedTaxiId !== null && String(taxi.taxi_id) === String(selectedTaxiId)) {
+                icon = selectedIcon;
+              } else if (isSpeeding) {
+                icon = speedingIcon;
+              } else if (isOutOfArea) {
+                icon = ooaIcon;
+              } else if (taxi.isParking) {
+                icon = parkingIcon;
+              } else {
+                icon = defaultIcon;
+              }
+
+              return (
+                  <Marker
+                      key={taxi.taxi_id}
+                      position={[taxi.latitude, taxi.longitude]}
+                      opacity={taxi._opacity}
+                      icon={icon}
+                  >
+                    <Popup>
+                      <div style={{ fontSize: 14 }}>
+                        <strong>Taxi ID:</strong> {taxi.taxi_id}<br />
+                        <strong>Timestamp:</strong> {taxi.timestamp}<br />
+                        <strong>Average Speed:</strong> {taxi.averageSpeed?.toFixed(1)} km/h<br />
+                        <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
+                        {isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
+                        <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km<br />
+                        {isOutOfArea ? ' ⚠️ Out of Area!' : ''}
+                      </div>
+                    </Popup>
+                  </Marker>
+              );
+            })}
           </MapContainer>
         </div>
 
