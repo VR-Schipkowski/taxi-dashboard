@@ -214,3 +214,18 @@
   filter: hue-rotate(180deg) saturate(1.6) brightness(1.1)
     drop-shadow(0 0 6px rgba(37, 99, 235, 0.7));
 }
+
+.leaflet-marker-icon,
+.leaflet-marker-shadow {
+  transition: opacity 1s linear;
+}
+
+.leaflet-marker-icon.speeding-marker {
+  filter: hue-rotate(150deg) saturate(6) brightness(0.9);
+  opacity: 1;
+}
+
+.leaflet-marker-icon.area-marker {
+  filter: hue-rotate(230deg) saturate(6) brightness(1);
+  opacity: 1;
+}

@@ -14,6 +14,24 @@ const defaultIcon = L.icon({
   popupAnchor: [1, -34],
 });
 
+const speedingIcon = L.icon({
+  iconUrl: markerIconPng,
+  shadowUrl: markerShadowPng,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  className: 'speeding-marker',
+});
+
+const ooaIcon = L.icon({
+  iconUrl: markerIconPng,
+  shadowUrl: markerShadowPng,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  className: 'area-marker',
+});
+
 const parkingIcon = L.icon({
   iconUrl: markerIconPng,
   shadowUrl: markerShadowPng,
@@ -37,6 +55,15 @@ const TAG_STYLES = {
   area: { bg: '#FAEEDA', color: '#854F0B', dot: '#BA7517' },
   taxiUpdate: { bg: '#E6F1FB', color: '#185FA5', dot: '#378ADD' },
 };
+
+const STALE_AFTER_MS = 30 * 1000;
+
+function getOpacity(lastSeenTime, now) {
+  if (!lastSeenTime) return 1;
+  const age = now - lastSeenTime;
+  if (age >= STALE_AFTER_MS) return 0;
+  return 1 - age / STALE_AFTER_MS;
+}
 
 function RecenterMap({ selectedTaxi }) {
   const map = useMap();
@@ -172,6 +199,14 @@ function App() {
   const [status, setStatus] = useState('Connecting...');
   const [selectedTaxiId, setSelectedTaxiId] = useState(null);
 
+  const [lastSeen, setLastSeen] = useState({});
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Debug alerts state
   const [debugEntries, setDebugEntries] = useState([]);
   const [debugCounts, setDebugCounts] = useState({ speeding: 0, area: 0, taxiUpdate: 0 });
@@ -198,7 +233,8 @@ function App() {
   }
 
   useEffect(() => {
-    const socket = new WebSocket('ws://localhost:5001');
+    // const socket = new WebSocket('ws://localhost:5001');
+    const socket = new WebSocket('ws://34.28.224.202:5001');
 
     socket.onopen = () => setStatus('Connected – Live-Stream active');
 
@@ -208,8 +244,11 @@ function App() {
 
         if (data.type === 'snapshot') {
           const map = {};
-          (data.taxis || []).forEach(t => { map[t.taxi_id] = t; });
+          const seen = {};
+          const receivedAt = Date.now();
+          (data.taxis || []).forEach(t => { map[t.taxi_id] = t; seen[t.taxi_id] = receivedAt; });
           setTaxiMap(map);
+          setLastSeen(seen);
           setSpeedingIncidents(data.speedingIncidents || []);
           setAreaViolations(data.areaViolations || []);
           addDebugEntry('taxiUpdate', `snapshot — ${data.taxis.length} taxis loaded`);
@@ -217,6 +256,7 @@ function App() {
         } else if (data.type === 'taxiUpdate') {
           const t = data.taxi;
           setTaxiMap(prev => ({ ...prev, [t.taxi_id]: t }));
+          setLastSeen(prev => ({ ...prev, [t.taxi_id]: Date.now() }));
           addDebugEntry(
             'taxiUpdate',
             `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? ' ⚡' : ''}${t.isParking ? ' 🅿' : ''}`,
@@ -245,9 +285,16 @@ function App() {
   }, []);
 
   const allTaxis = Object.values(taxiMap);
+
+  const violatingTaxiIds = new Set(areaViolations.map(v => String(v.taxiId)));
+
+  const visibleTaxis = allTaxis
+      .map(t => ({ ...t, _opacity: getOpacity(lastSeen[t.taxi_id], now) }))
+      .filter(t => t._opacity > 0);
+
   const taxis = selectedTaxiId === null
-    ? allTaxis
-    : allTaxis.filter(t => String(t.taxi_id) === String(selectedTaxiId));
+      ? visibleTaxis
+      : visibleTaxis.filter(t => String(t.taxi_id) === String(selectedTaxiId));
   const isConnected = status.includes('active') || status.includes('aktiv');
 
   return (
@@ -258,13 +305,13 @@ function App() {
         gap: 12, borderBottom: '1px solid #e5e7eb', flexShrink: 0,
         background: '#fff',
       }}>
-        <h1 style={{ margin: 0, fontSize: 18 }}>🚖 Taxi Live-Tracker</h1>
-        <span style={{ fontSize: 13, color: '#555' }}>
+        <h1 style={{margin: 0, fontSize: 18}}>🚖 Taxi Live-Tracker</h1>
+        <span style={{fontSize: 13, color: '#555'}}>
           <strong>Status:</strong>{' '}
-          <span style={{ color: isConnected ? '#16a34a' : '#dc2626' }}>{status}</span>
+          <span style={{color: isConnected ? '#16a34a' : '#dc2626'}}>{status}</span>
         </span>
-        <span style={{ fontSize: 13, color: '#555' }}>
-          <strong>Active:</strong> {allTaxis.length}
+        <span style={{fontSize: 13, color: '#555'}}>
+          <strong>Active:</strong> {visibleTaxis.length}
         </span>
         {selectedTaxiId !== null && (
           <span style={{ fontSize: 12, background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
@@ -272,18 +319,18 @@ function App() {
           </span>
         )}
         {speedingIncidents.length > 0 && (
-          <span style={{
-            fontSize: 12, background: '#FAECE7', color: '#993C1D',
-            padding: '2px 8px', borderRadius: 4, fontWeight: 500,
-          }}>
+            <span style={{
+              fontSize: 12, background: '#FAECE7', color: '#993C1D',
+              padding: '2px 8px', borderRadius: 4, fontWeight: 500,
+            }}>
             ⚠️ {speedingIncidents.length} speeding
           </span>
         )}
         {areaViolations.length > 0 && (
-          <span style={{
-            fontSize: 12, background: '#FAEEDA', color: '#854F0B',
-            padding: '2px 8px', borderRadius: 4, fontWeight: 500,
-          }}>
+            <span style={{
+              fontSize: 12, background: '#FAEEDA', color: '#854F0B',
+              padding: '2px 8px', borderRadius: 4, fontWeight: 500,
+            }}>
             🗺️ {areaViolations.length} area violations
           </span>
         )}
@@ -291,9 +338,9 @@ function App() {
       </header>
 
       {/* Main content */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{flex: 1, display: 'flex', overflow: 'hidden'}}>
         {/* Map */}
-        <div style={{ flex: 1, overflow: 'hidden' }}>
+        <div style={{flex: 1, overflow: 'hidden' }}>
           <MapContainer
             center={[39.9042, 116.4074]}
             zoom={12}
@@ -304,27 +351,44 @@ function App() {
               attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {taxis.map((taxi) => (
-              <Marker
-                key={taxi.taxi_id}
-                position={[taxi.latitude, taxi.longitude]}
-                icon={selectedTaxiId !== null && String(taxi.taxi_id) === String(selectedTaxiId)
-                  ? selectedIcon
-                  : (taxi.isParking ? parkingIcon : defaultIcon)}
-              >
-                <Popup>
-                  <div style={{ fontSize: 14 }}>
-                    <strong>Taxi ID:</strong> {taxi.taxi_id}<br />
-                    <strong>Timestamp:</strong> {taxi.timestamp}<br />
-                    <strong>Average Speed:</strong> {taxi.averageSpeed?.toFixed(1)} km/h<br />
-                    <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
-                    {taxi.isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
-                    <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km<br />
-                    {taxi.isOutOfArea ? ' ⚠️ Out of Area!' : ''}
-                  </div>
-                </Popup>
-              </Marker>
-            ))}
+            {taxis.map((taxi) => {
+              const isSpeeding = taxi.isSpeeding;
+              const isOutOfArea = violatingTaxiIds.has(String(taxi.taxi_id));
+
+              let icon;
+              if (selectedTaxiId !== null && String(taxi.taxi_id) === String(selectedTaxiId)) {
+                icon = selectedIcon;
+              } else if (isSpeeding) {
+                icon = speedingIcon;
+              } else if (isOutOfArea) {
+                icon = ooaIcon;
+              } else if (taxi.isParking) {
+                icon = parkingIcon;
+              } else {
+                icon = defaultIcon;
+              }
+
+              return (
+                  <Marker
+                      key={taxi.taxi_id}
+                      position={[taxi.latitude, taxi.longitude]}
+                      opacity={taxi._opacity}
+                      icon={icon}
+                  >
+                    <Popup>
+                      <div style={{ fontSize: 14 }}>
+                        <strong>Taxi ID:</strong> {taxi.taxi_id}<br />
+                        <strong>Timestamp:</strong> {taxi.timestamp}<br />
+                        <strong>Average Speed:</strong> {taxi.averageSpeed?.toFixed(1)} km/h<br />
+                        <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
+                        {isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
+                        <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km<br />
+                        {isOutOfArea ? ' ⚠️ Out of Area!' : ''}
+                      </div>
+                    </Popup>
+                  </Marker>
+              );
+            })}
           </MapContainer>
         </div>
 
