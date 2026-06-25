@@ -60,10 +60,10 @@ def generate_circle_taxi(
 
         travelled = speed_ms * elapsed
 
-        # Winkel auf Kreis
+        #angle on circle
         angle_deg = (travelled / circumference) * 360
 
-        # Start bei 12 Uhr => Norden
+        
         bearing = angle_deg
 
         lat, lon = destination_point(
@@ -74,7 +74,12 @@ def generate_circle_taxi(
         )
 
         records.append(
-            f"{taxi_id},{current_time:%Y-%m-%d %H:%M:%S},{lon:.5f},{lat:.5f}"
+            {
+                "taxi_id": taxi_id,
+                "timestamp": current_time,
+                "lon": lon,
+                "lat": lat,
+            }
         )
 
         current_time += timedelta(seconds=SEND_INTERVAL)
@@ -84,55 +89,50 @@ def generate_circle_taxi(
 
 def write_taxi_file(filename, records):
     with open(folder + "/" + filename, "w") as f:
-        for line in records:
-            f.write(line + "\n")
+        for record in records:
+            f.write(
+                f"{record['taxi_id']},{record['timestamp']:%Y-%m-%d %H:%M:%S},{record['lon']:.5f},{record['lat']:.5f}\n"
+            )
 
 
 
 
 parked = generate_circle_taxi(
-    taxi_id=10001,
+    taxi_id=0,
     speed_kmh=0,
     duration_minutes=30
 )
 
 normal = generate_circle_taxi(
-    taxi_id=10002,
+    taxi_id=45,
     speed_kmh=45,
     duration_minutes=30
 )
 
 speeding = generate_circle_taxi(
-    taxi_id=10003,
+    taxi_id=65,
     speed_kmh=65,
     duration_minutes=30
 )
 
 speedingfaster = generate_circle_taxi(
-    taxi_id=10004,
+    taxi_id=120,
     speed_kmh=120,
     duration_minutes=30)
 speedingfastest = generate_circle_taxi(
-    taxi_id=10005,
+    taxi_id=200,
     speed_kmh=200,
     duration_minutes=30)
 
 norma_out_of_area = generate_circle_taxi(
-    taxi_id=10006,
+    taxi_id=16000,
     speed_kmh=45,
     duration_minutes=30,
-    center_lat=CENTER_LAT,  # ca. 11 km nördlich
+    center_lat=CENTER_LAT,  
     center_lon=CENTER_LON,
-    radius_m=13000
+    radius_m=16000
 )
-norma_out_of_area2 = generate_circle_taxi(
-    taxi_id=10006,
-    speed_kmh=45,
-    duration_minutes=30,
-    center_lat=CENTER_LAT,  # ca. 11 km nördlich
-    center_lon=CENTER_LON,
-    radius_m=21000
-)
+
 
 write_taxi_file("taxi_parked.txt", parked)
 write_taxi_file("taxi_45.txt", normal)
@@ -140,4 +140,37 @@ write_taxi_file("taxi_65.txt", speeding)
 write_taxi_file("taxi_120.txt", speedingfaster)    
 write_taxi_file("taxi_200.txt", speedingfastest)
 write_taxi_file("taxi_45_out_of_area.txt", norma_out_of_area)
-write_taxi_file("taxi_45_out_of_area2.txt", norma_out_of_area2) 
+
+
+
+#lost signal:
+taxi = generate_circle_taxi(
+    taxi_id=2020,
+    speed_kmh=45,
+    duration_minutes=30,
+    center_lat=CENTER_LAT,  
+    center_lon=CENTER_LON,
+    radius_m=7000
+)
+stop_and_go = []
+start_time = taxi[0]["timestamp"]
+sending = 20
+not_sending = 20
+for i in taxi: 
+    if (i["timestamp"] - start_time).total_seconds() % (sending + not_sending) < sending:
+        stop_and_go.append(i)
+
+
+write_taxi_file("taxi_45_stop_and_go.txt", stop_and_go)
+
+#stop sending
+stop_sending = generate_circle_taxi(
+    taxi_id=3030,
+    speed_kmh=20,
+    duration_minutes=0.5,
+    center_lat=CENTER_LAT,      
+    center_lon=CENTER_LON,
+    radius_m=7000)
+
+    
+write_taxi_file("taxi_20_stop_sending.txt", stop_sending)
