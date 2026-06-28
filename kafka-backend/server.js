@@ -40,7 +40,7 @@ async function buildSnapshot() {
     let totalDistance = 0;
     for (const key of keys) {
         const data = await redis.hgetall(key);
-        if (data && data.latitude && data.longitude) {
+        if (data && data.latitude && data.longitude && data.isOutOfArea !== 'true') {
             taxis.push({
                 taxi_id: key.split(':')[2],
                 latitude: parseFloat(data.latitude),
