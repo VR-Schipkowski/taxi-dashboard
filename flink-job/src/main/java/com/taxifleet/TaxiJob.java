@@ -75,9 +75,28 @@ public class TaxiJob {
                         }
                 }).name("Store Information to Redis");
 
+                // Notify area violation — immediate, side output from OutOfAreaProcessFunction
+                SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
+                        .keyBy(speed -> speed.taxiId)
+                        .process(new OutOfAreaProcessFunction());
+                DataStream<TaxiSpeed> outOfAreaStream = outOfAreaCheckedStream
+                        .getSideOutput(OutOfAreaProcess.OUT_OF_AREA_TAG);
+                KafkaSink<String> violationsSink = KafkaSink.<String>builder()
+                        .setBootstrapServers(bootstrapServers)
+                        .setRecordSerializer(KafkaRecordSerializationSchema.builder()
+                                .setTopic("taxi-area-violations")
+                                .setValueSerializationSchema(new SimpleStringSchema())
+                                .build())
+                        .build();
+                DataStream<String> areaSnapshot = outOfAreaStream
+                        .keyBy(speed -> 0)
+                        .process(new ActiveAlarmsSweepFunction())
+                        .name("Area Active Alarms Snapshot");
+                areaSnapshot.sinkTo(violationsSink).name("Notify Area Violation");
+
                 // Propagate location to dashboard — throttled to one update per taxi per 5
-                // seconds
-                DataStream<TaxiSpeed> throttledStream = speedStream
+                // seconds (not sending OOA taxis)
+                DataStream<TaxiSpeed> throttledStream = outOfAreaCheckedStream
                                 .keyBy(speed -> speed.taxiId)
                                 .window(TumblingProcessingTimeWindows.of(Duration.ofSeconds(5)))
                                 .maxBy("timestamp");
@@ -101,22 +120,11 @@ public class TaxiJob {
                                                 .setValueSerializationSchema(new SimpleStringSchema())
                                                 .build())
                                 .build();
-                speedingStream.map(mapper::writeValueAsString).sinkTo(speedingSink).name("Notify Speeding");
-
-                // Notify area violation — immediate, side output from OutOfAreaProcessFunction
-                SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
-                                .keyBy(speed -> speed.taxiId)
-                                .process(new OutOfAreaProcessFunction());
-                DataStream<TaxiSpeed> outOfAreaStream = outOfAreaCheckedStream
-                                .getSideOutput(OutOfAreaProcess.OUT_OF_AREA_TAG);
-                KafkaSink<String> violationsSink = KafkaSink.<String>builder()
-                                .setBootstrapServers(bootstrapServers)
-                                .setRecordSerializer(KafkaRecordSerializationSchema.builder()
-                                                .setTopic("taxi-area-violations")
-                                                .setValueSerializationSchema(new SimpleStringSchema())
-                                                .build())
-                                .build();
-                outOfAreaStream.map(mapper::writeValueAsString).sinkTo(violationsSink).name("Notify Area Violation");
+                DataStream<String> speedingSnapshot = speedingStream
+                        .keyBy(speed -> 0)
+                        .process(new ActiveAlarmsSweepFunction())
+                        .name("Speeding Active Alarms Snapshot");
+                speedingSnapshot.sinkTo(speedingSink).name("Notify Speeding");
 
                 env.execute("Taxi Fleet Monitoring");
         }
