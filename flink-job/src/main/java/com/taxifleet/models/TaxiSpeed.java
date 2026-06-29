@@ -13,6 +13,11 @@ public class TaxiSpeed {
     public String lastMoved;
     public boolean isParking;
 
+    // Wall-clock epoch-millis from the provider, carried through so consumers can
+    // compute end-to-end pipeline latency (now - ingestedAt). Auto-serialized into
+    // taxi-processed because Jackson includes all public fields.
+    public long ingestedAt;
+
     public TaxiSpeed() {
     }
 
