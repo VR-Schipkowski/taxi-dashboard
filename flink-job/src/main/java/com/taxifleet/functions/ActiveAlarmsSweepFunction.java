@@ -38,10 +38,14 @@ public class ActiveAlarmsSweepFunction
 
     @Override
     public void processElement(TaxiSpeed event, Context ctx, Collector<String> out) throws Exception {
+        boolean isNewAlarm = !activeAlarms.contains(event.taxiId);
+
         activeAlarms.put(event.taxiId, event);
         lastSeen.put(event.taxiId, ctx.timerService().currentProcessingTime());
 
-        emitSnapshot(out);
+        if (isNewAlarm) {
+            emitSnapshot(out); // only emit when membership actually changes
+        }
 
         if (sweepScheduled.value() == null) {
             sweepScheduled.update(true);
