@@ -18,6 +18,33 @@ const ALARM_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const speedingIncidents = new Map(); // taxiId -> incident
 const areaViolations = new Map();    // taxiId -> violation
 
+// Rolling window of recent end-to-end latencies (ms) for the dashboard health panel.
+// Each taxi-processed event carries ingestedAt (provider publish time); latency is
+// now - ingestedAt, measured the moment the backend receives the event from Kafka.
+const recentLatencies = [];
+const LATENCY_WINDOW = 500; // keep the last N samples
+function recordLatency(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return;
+    recentLatencies.push(ms);
+    if (recentLatencies.length > LATENCY_WINDOW) recentLatencies.shift();
+}
+function latencyStats() {
+    if (recentLatencies.length === 0) return { avgLatencyMs: null, p95LatencyMs: null };
+    const sum = recentLatencies.reduce((a, b) => a + b, 0);
+    const avg = Math.round(sum / recentLatencies.length);
+    const sorted = [...recentLatencies].sort((a, b) => a - b);
+    const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
+    return { avgLatencyMs: avg, p95LatencyMs: sorted[idx] };
+}
+// Broadcast aggregated latency to all clients every 5s.
+setInterval(() => {
+    const stats = latencyStats();
+    if (stats.avgLatencyMs !== null) {
+        broadcast({ type: 'latencyStats', stats });
+        console.log(`[Latency] avg ${stats.avgLatencyMs}ms p95 ${stats.p95LatencyMs}ms (n=${recentLatencies.length})`);
+    }
+}, 5000);
+
 function pruneExpired(map, ttl) {
     const cutoff = Date.now() - ttl;
     let changed = false;
@@ -85,7 +112,7 @@ wss.on('connection', async (ws) => {
     ws.send(JSON.stringify({
         type: 'snapshot',
         taxis,
-        stats: { activeTaxiCount: taxis.length, totalDistance },
+        stats: { activeTaxiCount: taxis.length, totalDistance, ...latencyStats() },
         speedingIncidents: Array.from(speedingIncidents.values()),
         areaViolations: Array.from(areaViolations.values())
     }));
@@ -99,6 +126,8 @@ async function startConsumers() {
     await processedConsumer.run({
         eachMessage: async ({ message }) => {
             const event = JSON.parse(message.value.toString());
+            // End-to-end latency: now minus the provider ingestion timestamp.
+            if (event.ingestedAt) recordLatency(Date.now() - event.ingestedAt);
             broadcast({
                 type: 'taxiUpdate',
                 taxi: {
