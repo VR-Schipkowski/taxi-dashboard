@@ -82,14 +82,16 @@ public class SpeedCalculatorProcessFunction
                         count.update(0);
                         previousLocation.update(current);
 
-                        out.collect(new TaxiSpeed(
+                        TaxiSpeed first = new TaxiSpeed(
                                         current.taxiId,
                                         current.timestamp,
                                         current.longitude,
                                         current.latitude,
                                         0.0,
                                         0.0,
-                                        0.0));
+                                        0.0);
+                        first.ingestedAt = current.ingestedAt;
+                        out.collect(first);
 
                         return;
                 }
@@ -105,14 +107,16 @@ public class SpeedCalculatorProcessFunction
                         previousLocation.update(current);
                         count.update(1); // reset warmup after long gap
 
-                        out.collect(new TaxiSpeed(
+                        TaxiSpeed reset = new TaxiSpeed(
                                         current.taxiId,
                                         current.timestamp,
                                         current.longitude,
                                         current.latitude,
                                         0.0,
                                         0.0,
-                                        0.0));
+                                        0.0);
+                        reset.ingestedAt = current.ingestedAt;
+                        out.collect(reset);
                         return;
                 }
                 double speed = speedCalc(previous, current, timeDiffSeconds);
@@ -123,13 +127,15 @@ public class SpeedCalculatorProcessFunction
                                 count.update(c + 1);
 
                         }
-                        out.collect(new TaxiSpeed(
+                        TaxiSpeed warm = new TaxiSpeed(
                                         current.taxiId,
                                         current.timestamp,
                                         current.longitude,
                                         current.latitude,
                                         0.0,
-                                        0.0, 0.0));
+                                        0.0, 0.0);
+                        warm.ingestedAt = current.ingestedAt;
+                        out.collect(warm);
                         return;
                 }
 
@@ -151,6 +157,8 @@ public class SpeedCalculatorProcessFunction
                                 speed,
                                 totalDistanceKm.value() == null ? 0.0 : totalDistanceKm.value(),
                                 avarageTaxiSpeedKmh.value() == null ? 0.0 : avarageTaxiSpeedKmh.value());
+
+                result.ingestedAt = current.ingestedAt;
 
                 if (speed > SPEEDLIMIT) {
                         ctx.output(SpeedCalculatorProcess.SPEEDING_TAG, result);

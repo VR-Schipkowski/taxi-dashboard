@@ -11,6 +11,11 @@ public class TaxiLocation {
     public double longitude;
     public double latitude;
 
+    // Wall-clock epoch-millis stamped by the provider when this event was
+    // published to Kafka. Carried through the pipeline to measure end-to-end latency.
+    @JsonProperty("ingested_at")
+    public long ingestedAt;
+
     public TaxiLocation() {}
 
     public TaxiLocation(int taxiId, String timestamp, double longitude, double latitude) {

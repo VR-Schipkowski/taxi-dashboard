@@ -1,36 +1,40 @@
 package com.taxifleet.helper;
 
-//TODO: This class is not used in the current version of the code? MAbe it can be removed or re integrated
 /*
  * GeoFence for the taxi operating area.
  *
- * The T-Drive dataset tracks taxis in Beijing, so the default fence is a
- * bounding box that comfortably covers the city's metropolitan area
- * (roughly the area inside the 6th Ring Road). A taxi reporting a
- * position outside this box is considered to have "left the area" and
- * triggers an alert downstream.
+ * The T-Drive dataset tracks taxis in Beijing. "Out of area" is defined as a
+ * position more than MAX_DISTANCE_FROM_CITY_KM from the Forbidden City (the
+ * city centre). This is the SAME definition used by OutOfAreaProcessFunction,
+ * so the isOutOfArea flag set in the TaxiSpeed constructor is consistent with
+ * the alert side-output further down the pipeline.
  *
- * Bounds are intentionally generous; they are constants here so the team
- * can tighten them later without touching the calculator code.
+ * Keeping the rule here (and matching it to OutOfAreaProcessFunction) means the
+ * isOutOfArea field is correct everywhere it is read: Redis, the taxi-processed
+ * topic, and the dashboard payload.
  */
 public final class GeoFence {
 
-    // Beijing metropolitan bounding box (covers the 6th Ring Road area).
-    public static final double MIN_LAT = 39.60;
-    public static final double MAX_LAT = 40.20;
-    public static final double MIN_LON = 116.10;
-    public static final double MAX_LON = 116.80;
+    // City centre reference point (Forbidden City) — must match
+    // OutOfAreaProcessFunction.
+    public static final double FORBIDDEN_CITY_LATITUDE = 39.9163;
+    public static final double FORBIDDEN_CITY_LONGITUDE = 116.3972;
+
+    // A taxi further than this from the city centre is "out of area".
+    public static final double MAX_DISTANCE_FROM_CITY_KM = 15.0;
 
     private GeoFence() {
         // utility class
     }
 
     /**
-     * Returns true when (latitude, longitude) sits outside the operating
-     * area defined by the constants above.
+     * Returns true when (latitude, longitude) is more than
+     * MAX_DISTANCE_FROM_CITY_KM from the city centre.
      */
     public static boolean isOutOfArea(double latitude, double longitude) {
-        return latitude < MIN_LAT || latitude > MAX_LAT
-                || longitude < MIN_LON || longitude > MAX_LON;
+        double distanceKm = Helper.calculateDistance(
+                latitude, longitude,
+                FORBIDDEN_CITY_LATITUDE, FORBIDDEN_CITY_LONGITUDE);
+        return distanceKm > MAX_DISTANCE_FROM_CITY_KM;
     }
 }
