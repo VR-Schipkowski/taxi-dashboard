@@ -21,7 +21,7 @@ public class TaxiSpeed {
         this.timestamp = timestamp;
         this.longitude = longitude;
         this.latitude = latitude;
-        this.isOutOfArea = com.taxifleet.helper.GeoFence.isOutOfArea(latitude, longitude);
+        // Removed, since this brings in doubled logic: this.isOutOfArea = com.taxifleet.helper.GeoFence.isOutOfArea(latitude, longitude);
     }
 
     public TaxiSpeed(int taxiId, String timestamp, double longitude, double latitude, double speed) {
@@ -40,7 +40,7 @@ public class TaxiSpeed {
         this.totalDistance = totalDistance;
         this.averageSpeed = averageSpeed;
         this.isSpeeding = speed > 60;
-        this.isOutOfArea = com.taxifleet.helper.GeoFence.isOutOfArea(latitude, longitude);
+        // Removed, since this bring in doubled logic: this.isOutOfArea = com.taxifleet.helper.GeoFence.isOutOfArea(latitude, longitude);
     }
 
     @Override
