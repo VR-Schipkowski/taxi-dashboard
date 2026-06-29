@@ -43,24 +43,6 @@ setInterval(() => {
         console.log(`[Latency] avg ${stats.avgLatencyMs}ms p95 ${stats.p95LatencyMs}ms (n=${recentLatencies.length})`);
     }
 }, 5000);
-
-function pruneExpired(map, ttl) {
-    const cutoff = Date.now() - ttl;
-    let changed = false;
-    for (const [taxiId, entry] of map) {
-        if (entry.receivedAt < cutoff) {
-            map.delete(taxiId);
-            changed = true;
-        }
-    }
-    return changed;
-}
-setInterval(() => {
-    const speedingChanged = pruneExpired(speedingIncidents, ALARM_TTL_MS);
-    const violationsChanged = pruneExpired(areaViolations, ALARM_TTL_MS);
-    if (speedingChanged) broadcast({ type: 'alarmsSync', kind: 'speeding', speedingIncidents: Array.from(speedingIncidents.values()) });
-    if (violationsChanged) broadcast({ type: 'alarmsSync', kind: 'area', areaViolations: Array.from(areaViolations.values()) });
-}, 30_000);
 // DEBUG ENDPOINT - remove before production
 app.get('/debug', async (req, res) => {
     const keys = await redis.keys('taxi:speed:*');
@@ -112,8 +94,8 @@ wss.on('connection', async (ws) => {
         type: 'snapshot',
         taxis,
         stats: { activeTaxiCount: taxis.length, totalDistance, ...latencyStats() },
-        speedingIncidents: Array.from(speedingIncidents.values()),
-        areaViolations: Array.from(areaViolations.values())
+        speedingIncidents,
+        areaViolations
     }));
 });
 
