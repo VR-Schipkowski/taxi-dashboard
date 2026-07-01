@@ -1,5 +1,6 @@
 package com.taxifleet.models;
 
+//todo: maybe use time instead of strings, then we probably dont have to parse them all over again
 public class TaxiSpeed {
     public int taxiId;
     public String timestamp;
