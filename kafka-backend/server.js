@@ -3,6 +3,8 @@ const { WebSocketServer } = require('ws');
 const cors = require('cors');
 const Redis = require('ioredis');
 const { Kafka } = require('kafkajs');
+const TAXI_API_URL = process.env.TAXI_API_URL || 'http://taxi-api:8000';
+
 
 const app = express();
 app.use(cors());
@@ -71,6 +73,29 @@ app.get('/debug', async (req, res) => {
     }
     res.json(result);
 });
+// wrapper for db calls to taxi-api
+app.get('/taxis/:id/locations', async (req, res) => {
+    const { id } = req.params;
+    const limit = req.query.limit || 10;
+
+    try {
+        const upstream = await fetch(
+            `${TAXI_API_URL}/taxis/${encodeURIComponent(id)}/locations?limit=${encodeURIComponent(limit)}`
+        );
+
+        if (!upstream.ok) {
+            const detail = await upstream.text().catch(() => '');
+            return res.status(upstream.status).json({ error: 'taxi-api error', detail });
+        }
+
+        const data = await upstream.json();
+        res.json(data);
+    } catch (err) {
+        console.error('Fehler beim Aufruf von taxi-api:', err);
+        res.status(502).json({ error: 'taxi-api nicht erreichbar' });
+    }
+});
+
 
 function broadcast(payload) {
     const msg = JSON.stringify(payload);
@@ -163,6 +188,7 @@ async function startConsumers() {
             });
         }
     });
+
 
     // Consumer for taxi-area-violations — immediate alert broadcast
     const violationsConsumer = kafka.consumer({ groupId: 'backend-violations' });
