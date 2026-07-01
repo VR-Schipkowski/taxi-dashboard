@@ -38,7 +38,12 @@ public class TaxiJob {
                                 source,
                                 WatermarkStrategy.noWatermarks(),
                                 "Kafka Taxi Source");
-
+                // Todo : maybe better to reuse object mapper if possible
+                // ToDo: dont know if filtering is necessary, we could do the out of area check,
+                // this also decreases the amount of data send to speed calcolations
+                // here and then only further process the data inside the area
+                // no double check, but maybe we want to filter out invalid data before doing
+                // any processing
                 DataStream<TaxiLocation> locationStream = kafkaStream
                                 .map(json -> {
                                         ObjectMapper mapper = new ObjectMapper();
@@ -50,8 +55,9 @@ public class TaxiJob {
                                                 location.longitude <= 180 &&
                                                 location.latitude != 0.0 &&
                                                 location.longitude != 0.0)
-                                .name("Parse JSON + Watermarks");
-
+                                .name("Parse JSON and Filter Invalid Locations");
+                // Todo : reasoning for windowing, maybe instead of sending last we could use
+                // the windows to denoise the position also we have a throtteling later on
                 DataStream<TaxiLocation> filteredLocationStream = locationStream
                                 .keyBy(location -> location.taxiId)
                                 .window(TumblingProcessingTimeWindows.of(Duration.ofSeconds(5)))
@@ -74,28 +80,41 @@ public class TaxiJob {
                                 redisSink.store(speed);
                         }
                 }).name("Store Information to Redis");
-
+                // ToDO: Creating RedisSink in main() and capturing it inside an operator can
+                // cause serialization/lifecycle issues in Flink (connections should typically
+                // be created in open() and closed in close(), and the function must be safely
+                // serializable). Consider implementing a proper Flink Sink/RichSinkFunction (or
+                // SinkWriter/Sink depending on your Flink version) that manages the Redis
+                // connection lifecycle per task.
                 // Notify area violation — immediate, side output from OutOfAreaProcessFunction
                 SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
-                        .keyBy(speed -> speed.taxiId)
-                        .process(new OutOfAreaProcessFunction());
+                                .keyBy(speed -> speed.taxiId)
+                                .process(new OutOfAreaProcessFunction());
                 DataStream<TaxiSpeed> outOfAreaStream = outOfAreaCheckedStream
-                        .getSideOutput(OutOfAreaProcess.OUT_OF_AREA_TAG);
+                                .getSideOutput(OutOfAreaProcess.OUT_OF_AREA_TAG);
                 KafkaSink<String> violationsSink = KafkaSink.<String>builder()
-                        .setBootstrapServers(bootstrapServers)
-                        .setRecordSerializer(KafkaRecordSerializationSchema.builder()
-                                .setTopic("taxi-area-violations")
-                                .setValueSerializationSchema(new SimpleStringSchema())
-                                .build())
-                        .build();
+                                .setBootstrapServers(bootstrapServers)
+                                .setRecordSerializer(KafkaRecordSerializationSchema.builder()
+                                                .setTopic("taxi-area-violations")
+                                                .setValueSerializationSchema(new SimpleStringSchema())
+                                                .build())
+                                .build();
+                // ToDo:Using keyBy(speed -> 0) forces all events to a single key, creating a
+                // hotspot and effectively reducing parallelism to 1 for these branches. If
+                // global aggregation is intended, make it explicit (e.g., windowAll/process on
+                // an all-stream) and/or set parallelism deliberately; otherwise, consider a
+                // design that keeps work partitioned (e.g., partial aggregates per key followed
+                // by a merge).
+
                 DataStream<String> areaSnapshot = outOfAreaStream
-                        .keyBy(speed -> 0)
-                        .process(new ActiveAlarmsSweepFunction())
-                        .name("Area Active Alarms Snapshot");
+                                .keyBy(speed -> 0)
+                                .process(new ActiveAlarmsSweepFunction())
+                                .name("Area Active Alarms Snapshot");
                 areaSnapshot.sinkTo(violationsSink).name("Notify Area Violation");
 
                 // Propagate location to dashboard — throttled to one update per taxi per 5
                 // seconds (not sending OOA taxis)
+                // Todo: why throttle again already done in the front
                 DataStream<TaxiSpeed> throttledStream = outOfAreaCheckedStream
                                 .keyBy(speed -> speed.taxiId)
                                 .window(TumblingProcessingTimeWindows.of(Duration.ofSeconds(5)))
@@ -120,10 +139,12 @@ public class TaxiJob {
                                                 .setValueSerializationSchema(new SimpleStringSchema())
                                                 .build())
                                 .build();
+                // Todo: this kills paralsim, i dont know if its nessesary as they are already
+                // throttled
                 DataStream<String> speedingSnapshot = speedingStream
-                        .keyBy(speed -> 0)
-                        .process(new ActiveAlarmsSweepFunction())
-                        .name("Speeding Active Alarms Snapshot");
+                                .keyBy(speed -> 0)
+                                .process(new ActiveAlarmsSweepFunction())
+                                .name("Speeding Active Alarms Snapshot");
                 speedingSnapshot.sinkTo(speedingSink).name("Notify Speeding");
 
                 env.execute("Taxi Fleet Monitoring");
