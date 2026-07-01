@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS taxi_speed (
     id               BIGSERIAL PRIMARY KEY,
     taxi_id          INTEGER NOT NULL,
-    event_timestamp  TEXT,
+    event_timestamp  TIMESTAMPTZ NOT NULL,
     longitude        DOUBLE PRECISION,
     latitude         DOUBLE PRECISION,
     speed            DOUBLE PRECISION,

@@ -71,6 +71,27 @@ def start_consumer_thread() -> None:
     thread = threading.Thread(target=consume_loop, daemon=True)
     thread.start()
 
+@app.get("/taxis/{taxi_id}/locations")
+def get_last_locations(taxi_id: int, limit: int = Query(5, le=1000)):
+    """Letzte `limit` Standorte eines Taxis, sortiert nach event_timestamp
+    (neuester zuerst)."""
+    sql = """
+        SELECT taxi_id, event_timestamp, longitude, latitude, speed,
+               average_speed, total_distance, is_speeding, is_out_of_area,
+               is_parking
+        FROM taxi_speed
+        WHERE taxi_id = %s
+        ORDER BY event_timestamp DESC
+        LIMIT %s
+    """
+    with get_conn() as conn, conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+        cur.execute(sql, (taxi_id, limit))
+        rows = cur.fetchall()
+        if not rows:
+            raise HTTPException(status_code=404, detail="Keine Standorte fuer dieses Taxi gefunden")
+        return rows
+
+
 
 @app.get("/health")
 def health():
