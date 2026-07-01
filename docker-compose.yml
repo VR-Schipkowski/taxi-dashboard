@@ -69,6 +69,11 @@ services:
   flink-jobmanager:
     image: flink:1.20-java11
     container_name: flink-jobmanager
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+      redis-init:
+        condition: service_completed_successfully
     ports:
       - "8081:8081"
     command: jobmanager
@@ -124,3 +129,41 @@ services:
         condition: service_healthy
     entrypoint: [ "redis-cli", "-h", "redis", "FLUSHALL" ]
     restart: "no"
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_DB: taxifleet
+      POSTGRES_USER: taxi
+      POSTGRES_PASSWORD: taxi
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./taxi-api/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U taxi -d taxifleet" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  taxi-api:
+    build: ./taxi-api
+    container_name: taxi-api
+    restart: on-failure
+    environment:
+      DATABASE_URL: postgresql://taxi:taxi@postgres:5432/taxifleet
+      KAFKA_BOOTSTRAP: kafka:9092
+      KAFKA_TOPIC: taxi-processed
+      KAFKA_GROUP_ID: taxi-api-consumer
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:
