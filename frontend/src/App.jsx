@@ -1,11 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import './App.css';
 import 'leaflet/dist/leaflet.css';
 import markerIconPng from 'leaflet/dist/images/marker-icon.png';
 import markerShadowPng from 'leaflet/dist/images/marker-shadow.png';
 // Todo: Refactor panels in seperate components
+// Todo maybe make a deployment branch which can be rebased from main, wich changes this const
+//change for deployment
+// const API_BASE = 'http://34.28.224.202:5001';
+const API_BASE = 'http://localhost:5001';
+
+
+const PATH_LOCATIONS_LIMIT = 20;
+
 const defaultIcon = L.icon({
   iconUrl: markerIconPng,
   shadowUrl: markerShadowPng,
@@ -79,6 +87,53 @@ function RecenterMap({ selectedTaxi }) {
   return null;
 }
 
+function TaxiSearchBox({ onSelect, onClear, selectedTaxiId }) {
+  const [value, setValue] = useState('');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const trimmed = value.trim();
+    if (trimmed === '') return;
+    onSelect(trimmed);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="select taxi"
+        style={{
+          padding: '4px 8px', fontSize: 13, border: '1px solid #d1d5db',
+          borderRadius: 4, width: 120,
+        }}
+      />
+      <button
+        type="submit"
+        style={{
+          padding: '4px 10px', fontSize: 13, border: '1px solid #d1d5db',
+          borderRadius: 4, background: '#fff', cursor: 'pointer',
+        }}
+      >
+        Suchen
+      </button>
+      {selectedTaxiId !== null && (
+        <button
+          type="button"
+          onClick={() => { setValue(''); onClear(); }}
+          style={{
+            padding: '4px 10px', fontSize: 13, border: '1px solid #d1d5db',
+            borderRadius: 4, background: '#fff', cursor: 'pointer', color: '#555',
+          }}
+        >
+          deselect
+        </button>
+      )}
+    </form>
+  );
+}
+
 function DebugAlerts({ entries, counts, filters, onToggleFilter, onClear, selectedTaxiId, onSelectTaxi }) {
   const logRef = useRef(null);
 
@@ -86,7 +141,12 @@ function DebugAlerts({ entries, counts, filters, onToggleFilter, onClear, select
     if (logRef.current) logRef.current.scrollTop = 0;
   }, [entries.length]);
 
-  const visible = entries.filter(e => filters[e.type]);
+  // Only show selected taxi allerts
+  const visible = entries.filter(e => {
+    if (!filters[e.type]) return false;
+    if (selectedTaxiId !== null && String(e.taxiId) !== String(selectedTaxiId)) return false;
+    return true;
+  });
 
   return (
     <div style={{
@@ -102,7 +162,7 @@ function DebugAlerts({ entries, counts, filters, onToggleFilter, onClear, select
       {/* Header */}
       <div style={{ padding: '10px 12px', borderBottom: '1px solid #e5e7eb' }}>
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: '#111' }}>
-          Alerts
+          Alerts{selectedTaxiId !== null ? ` — Taxi ${selectedTaxiId}` : ''}
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {['speeding', 'area', 'taxiUpdate'].map(type => {
@@ -149,7 +209,7 @@ function DebugAlerts({ entries, counts, filters, onToggleFilter, onClear, select
       <div ref={logRef} style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {visible.length === 0 ? (
           <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#aaa' }}>
-            waiting for events…
+            {selectedTaxiId !== null ? 'keine Alerts fuer dieses Taxi…' : 'waiting for events…'}
           </div>
         ) : (
           visible.map((entry, i) => {
@@ -202,6 +262,10 @@ function App() {
   const [lastSeen, setLastSeen] = useState({});
   const [now, setNow] = useState(Date.now());
 
+  // Pfad (letzte N Standorte) des ausgewaehlten Taxis, aus der REST-API geladen.
+  const [pathLocations, setPathLocations] = useState([]);
+  const [pathError, setPathError] = useState(null);
+
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
@@ -232,9 +296,49 @@ function App() {
     setSelectedTaxiId(prev => (String(prev) === String(taxiId) ? null : taxiId));
   }
 
+  // Wird sowohl vom Suchfeld als auch vom Klick auf einen Marker/Alert genutzt.
+  function selectTaxi(taxiId) {
+    setSelectedTaxiId(taxiId);
+  }
+
+  function clearSelection() {
+    setSelectedTaxiId(null);
+  }
+
+  // Laedt die letzten PATH_LOCATIONS_LIMIT Standorte des ausgewaehlten Taxis
+  // aus der REST-API, sobald sich die Auswahl aendert.
   useEffect(() => {
-    // const socket = new WebSocket('ws://localhost:5001');
-    const socket = new WebSocket('ws://34.28.224.202:5001');
+    if (selectedTaxiId === null) {
+      setPathLocations([]);
+      setPathError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setPathError(null);
+
+    fetch(`${API_BASE}/taxis/${selectedTaxiId}/locations?limit=${PATH_LOCATIONS_LIMIT}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        // API liefert neueste zuerst -> fuer den Pfad chronologisch (aeltest -> neuest) umdrehen.
+        setPathLocations([...data].reverse());
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Fehler beim Laden des Pfads:', err);
+        setPathLocations([]);
+        setPathError('Konnte Standorte nicht laden');
+      });
+
+    return () => { cancelled = true; };
+  }, [selectedTaxiId]);
+
+  useEffect(() => {
+    const socket = new WebSocket(API_BASE);
 
     socket.onopen = () => setStatus('Connected – Live-Stream active');
 
@@ -289,13 +393,24 @@ function App() {
   const violatingTaxiIds = new Set(areaViolations.map(v => String(v.taxiId)));
 
   const visibleTaxis = allTaxis
-      .map(t => ({ ...t, _opacity: getOpacity(lastSeen[t.taxi_id], now) }))
-      .filter(t => t._opacity > 0);
+    .map(t => ({ ...t, _opacity: getOpacity(lastSeen[t.taxi_id], now) }))
+    .filter(t => t._opacity > 0);
 
+  // only show selected
   const taxis = selectedTaxiId === null
-      ? visibleTaxis
-      : visibleTaxis.filter(t => String(t.taxi_id) === String(selectedTaxiId));
+    ? visibleTaxis
+    : visibleTaxis.filter(t => String(t.taxi_id) === String(selectedTaxiId));
   const isConnected = status.includes('active') || status.includes('aktiv');
+
+  const normalizedPathLocations = pathLocations
+    .map((p) => ({
+      ...p,
+      latitude: Number(p.latitude),
+      longitude: Number(p.longitude),
+    }))
+    .filter((p) => Number.isFinite(p.latitude) && Number.isFinite(p.longitude));
+
+  const pathPositions = normalizedPathLocations.map((p) => [p.latitude, p.longitude]);
 
   return (
     <div style={{ padding: 0, fontFamily: 'sans-serif', height: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -303,34 +418,42 @@ function App() {
       <header style={{
         padding: '10px 16px', display: 'flex', alignItems: 'center',
         gap: 12, borderBottom: '1px solid #e5e7eb', flexShrink: 0,
-        background: '#fff',
+        background: '#fff', flexWrap: 'wrap',
       }}>
-        <h1 style={{margin: 0, fontSize: 18}}>🚖 Taxi Live-Tracker</h1>
-        <span style={{fontSize: 13, color: '#555'}}>
+        <h1 style={{ margin: 0, fontSize: 18 }}>🚖 Taxi Live-Tracker</h1>
+        <span style={{ fontSize: 13, color: '#555' }}>
           <strong>Status:</strong>{' '}
-          <span style={{color: isConnected ? '#16a34a' : '#dc2626'}}>{status}</span>
+          <span style={{ color: isConnected ? '#16a34a' : '#dc2626' }}>{status}</span>
         </span>
-        <span style={{fontSize: 13, color: '#555'}}>
+        <span style={{ fontSize: 13, color: '#555' }}>
           <strong>Active:</strong> {visibleTaxis.length}
         </span>
+
+        <TaxiSearchBox onSelect={selectTaxi} onClear={clearSelection} selectedTaxiId={selectedTaxiId} />
+
         {selectedTaxiId !== null && (
           <span style={{ fontSize: 12, background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
             focused taxi: {selectedTaxiId}
           </span>
         )}
+        {pathError && (
+          <span style={{ fontSize: 12, background: '#FAECE7', color: '#993C1D', padding: '2px 8px', borderRadius: 4 }}>
+            {pathError}
+          </span>
+        )}
         {speedingIncidents.length > 0 && (
-            <span style={{
-              fontSize: 12, background: '#FAECE7', color: '#993C1D',
-              padding: '2px 8px', borderRadius: 4, fontWeight: 500,
-            }}>
+          <span style={{
+            fontSize: 12, background: '#FAECE7', color: '#993C1D',
+            padding: '2px 8px', borderRadius: 4, fontWeight: 500,
+          }}>
             ⚠️ {speedingIncidents.length} speeding
           </span>
         )}
         {areaViolations.length > 0 && (
-            <span style={{
-              fontSize: 12, background: '#FAEEDA', color: '#854F0B',
-              padding: '2px 8px', borderRadius: 4, fontWeight: 500,
-            }}>
+          <span style={{
+            fontSize: 12, background: '#FAEEDA', color: '#854F0B',
+            padding: '2px 8px', borderRadius: 4, fontWeight: 500,
+          }}>
             🗺️ {areaViolations.length} area violations
           </span>
         )}
@@ -338,9 +461,9 @@ function App() {
       </header>
 
       {/* Main content */}
-      <div style={{flex: 1, display: 'flex', overflow: 'hidden'}}>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Map */}
-        <div style={{flex: 1, overflow: 'hidden' }}>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
           <MapContainer
             center={[39.9042, 116.4074]}
             zoom={12}
@@ -351,6 +474,26 @@ function App() {
               attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
+
+            {selectedTaxiId !== null && pathPositions.length > 1 && (
+              <Polyline
+                key={`poly-${selectedTaxiId}`}
+                positions={pathPositions}
+                pathOptions={{ color: '#1D4ED8', weight: 3, opacity: 0.7 }}
+              />
+            )}
+
+            {selectedTaxiId !== null && normalizedPathLocations.map((p, idx) => (
+              <CircleMarker
+                key={`path-${selectedTaxiId}-${idx}`}
+                center={[p.latitude, p.longitude]}
+                radius={4}
+                pathOptions={{ color: '#1D4ED8', fillColor: '#1D4ED8', fillOpacity: 0.6 }}
+              >
+                <Popup>{p.event_timestamp}</Popup>
+              </CircleMarker>
+            ))}
+
             {taxis.map((taxi) => {
               const isSpeeding = taxi.isSpeeding;
               const isOutOfArea = violatingTaxiIds.has(String(taxi.taxi_id));
@@ -369,24 +512,25 @@ function App() {
               }
 
               return (
-                  <Marker
-                      key={taxi.taxi_id}
-                      position={[taxi.latitude, taxi.longitude]}
-                      opacity={taxi._opacity}
-                      icon={icon}
-                  >
-                    <Popup>
-                      <div style={{ fontSize: 14 }}>
-                        <strong>Taxi ID:</strong> {taxi.taxi_id}<br />
-                        <strong>Timestamp:</strong> {taxi.timestamp}<br />
-                        <strong>Average Speed:</strong> {taxi.averageSpeed?.toFixed(1)} km/h<br />
-                        <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
-                        {isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
-                        <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km<br />
-                        {isOutOfArea ? ' ⚠️ Out of Area!' : ''}
-                      </div>
-                    </Popup>
-                  </Marker>
+                <Marker
+                  key={taxi.taxi_id}
+                  position={[taxi.latitude, taxi.longitude]}
+                  opacity={taxi._opacity}
+                  icon={icon}
+                  eventHandlers={{ click: () => selectTaxi(taxi.taxi_id) }}
+                >
+                  <Popup>
+                    <div style={{ fontSize: 14 }}>
+                      <strong>Taxi ID:</strong> {taxi.taxi_id}<br />
+                      <strong>Timestamp:</strong> {taxi.timestamp}<br />
+                      <strong>Average Speed:</strong> {taxi.averageSpeed?.toFixed(1)} km/h<br />
+                      <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
+                      {isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
+                      <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km<br />
+                      {isOutOfArea ? ' ⚠️ Out of Area!' : ''}
+                    </div>
+                  </Popup>
+                </Marker>
               );
             })}
           </MapContainer>
