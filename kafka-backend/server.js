@@ -64,7 +64,8 @@ function broadcast(payload) {
 async function buildSnapshot() {
     const keys = await redis.keys('taxi:speed:*');
     const taxis = [];
-    let totalDistance = 0;
+    // TODO: check why is this done?
+    let totalDistanceAll = 0;
     for (const key of keys) {
         const data = await redis.hgetall(key);
         if (data && data.latitude && data.longitude) {
@@ -73,6 +74,7 @@ async function buildSnapshot() {
                 latitude: parseFloat(data.latitude),
                 longitude: parseFloat(data.longitude),
                 speed: parseFloat(data.speed),
+                // TODO: have two times the same distance, need to change that
                 distance: parseFloat(data.distance),
                 timestamp: data.timestamp,
                 isSpeeding: data.isSpeeding === 'true',
@@ -81,19 +83,19 @@ async function buildSnapshot() {
                 lastMoved: data.lastMoved && data.lastMoved !== 'null' ? data.lastMoved : '',
                 isParking: data.isParking === 'true'
             });
-            totalDistance += parseFloat(data.distance) || 0;
+            totalDistanceAll += parseFloat(data.totalDistance) || 0;
         }
     }
-    return { taxis, totalDistance };
+    return { taxis, totalDistanceAll };
 }
 
 // New client connects — send full snapshot from Redis so map is not empty
 wss.on('connection', async (ws) => {
-    const { taxis, totalDistance } = await buildSnapshot();
+    const { taxis, totalDistanceAll } = await buildSnapshot();
     ws.send(JSON.stringify({
         type: 'snapshot',
         taxis,
-        stats: { activeTaxiCount: taxis.length, totalDistance, ...latencyStats() },
+        stats: { activeTaxiCount: taxis.length, totalDistanceAll, ...latencyStats() },
         speedingIncidents,
         areaViolations
     }));

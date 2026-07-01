@@ -5,8 +5,8 @@ import './App.css';
 import 'leaflet/dist/leaflet.css';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 
-// const wsLink = 'ws://localhost:5001';
-const wsLink = 'ws://34.28.224.202:5001';
+const wsLink = 'ws://localhost:5001';
+// const wsLink = 'ws://34.28.224.202:5001';
 // Todo: Refactor panels in seperate components
 function createDotIcon({ color, size = 14, variant = 'default', ring = false, ringColor }) {
   return L.divIcon({
@@ -200,6 +200,11 @@ function App() {
   const [areaViolations, setAreaViolations] = useState([]);
   const [status, setStatus] = useState('Connecting...');
   const [selectedTaxiId, setSelectedTaxiId] = useState(null);
+  const [totalDistanceAll, setTotalDistanceAll] = useState(null);
+  // states for latency display
+  const [latency, setLatency] = useState(null);
+  const [latencyHistory, setLatencyHistory] = useState([]);
+  const [latencyTrend, setLatencyTrend] = useState(null);
 
   //fadeout
   const [lastSeen, setLastSeen] = useState({});
@@ -228,6 +233,15 @@ function App() {
     }, 3000);
     return () => clearInterval(flush);
   }, []);
+
+  //get total distance travelled
+  useEffect(() => {
+    const total = Object.values(taxiMap).reduce(
+      (sum, taxi) => sum + (taxi.totalDistance || 0),
+      0
+    );
+    setTotalDistanceAll(total);
+  }, [taxiMap]);
 
   function createClusterIcon(cluster) {
     const childMarkers = cluster.getAllChildMarkers();
@@ -327,6 +341,13 @@ function App() {
           setSpeedingIncidents(data.speedingIncidents || []);
           setAreaViolations(data.areaViolations || []);
           addDebugEntry('taxiUpdate', `snapshot — ${data.taxis.length} taxis loaded`);
+          
+          // Extract latency from initial snapshot and convert ms to seconds
+          if (data.stats && data.stats.avgLatencyMs) {
+            const initialLatency = data.stats.avgLatencyMs / 1000;
+            setLatency(initialLatency);
+            setLatencyHistory([initialLatency]);
+          }
 
         } else if (data.type === 'taxiUpdate') {
           const t = data.taxi;
@@ -337,6 +358,20 @@ function App() {
               `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? ' ⚡' : ''}${t.isParking ? ' 🅿' : ''}`,
               t.taxi_id
           );
+        
+        } else if (data.type === 'latencyStats') {
+          const newLatency = data.stats.avgLatencyMs / 1000; // Convert ms to seconds
+          setLatency(newLatency);
+          
+          // Track trend by comparing with last values
+          setLatencyHistory(prev => {
+            const newHistory = [...prev, newLatency].slice(-5); // Keep last 5 values
+            if (newHistory.length >= 2) {
+              const previous = newHistory[newHistory.length - 2];
+              setLatencyTrend(newLatency > previous ? 'up' : newLatency < previous ? 'down' : null);
+            }
+            return newHistory;
+          });
 
         } else if (data.type === 'speedingAlert') {
           const i = data.speedingIncidents;
@@ -415,6 +450,9 @@ function App() {
           <span style={{fontSize: 13, color: '#555'}}>
           <strong>Active:</strong> {visibleTaxis.length}
         </span>
+          <span style={{fontSize: 13, color: '#555'}}>
+          <strong>Total distance travelled:</strong> {totalDistanceAll != null ? `${totalDistanceAll.toFixed(1)} km` : 'N/A'}
+        </span>
           {selectedTaxiId !== null && (
               <span style={{
                 fontSize: 12,
@@ -453,6 +491,11 @@ function App() {
                 🗺️ {areaViolations.length} area violations
               </button>
           )}
+            <span style={{fontSize: 13, color: '#555'}}>
+            <strong>Latency:</strong> {latency !== null ? `${latency.toFixed(2)}s` : 'N/A'}
+            {latencyTrend === 'up' && <span style={{color: '#dc2626', marginLeft: 4}}>↑</span>}
+            {latencyTrend === 'down' && <span style={{color: '#16a34a', marginLeft: 4}}>↓</span>}
+          </span>
 
         </header>
 

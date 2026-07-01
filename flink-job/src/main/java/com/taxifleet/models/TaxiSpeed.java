@@ -8,6 +8,7 @@ public class TaxiSpeed {
     public double speed;
     public double averageSpeed;
     public double totalDistance;
+    public double curDistance;
     public boolean isSpeeding;
     public boolean isOutOfArea;
     public String lastMoved;
@@ -30,18 +31,19 @@ public class TaxiSpeed {
     }
 
     public TaxiSpeed(int taxiId, String timestamp, double longitude, double latitude, double speed) {
-        this(taxiId, timestamp, longitude, latitude, speed, 0.0, 0.0);
+        this(taxiId, timestamp, longitude, latitude, speed, 0.0, 0.0, 0.0);
     }
 
     // TODO: remove logic and fuction calles from the models and move it to the
     // process function, models should be pure data objects
-    public TaxiSpeed(int taxiId, String timestamp, double longitude, double latitude, double speed,
+    public TaxiSpeed(int taxiId, String timestamp, double longitude, double latitude, double speed, double curDistance,
             double totalDistance, double averageSpeed) {
         this.taxiId = taxiId;
         this.timestamp = timestamp;
         this.longitude = longitude;
         this.latitude = latitude;
         this.speed = speed;
+        this.curDistance = curDistance;
         this.totalDistance = totalDistance;
         this.averageSpeed = averageSpeed;
         this.isSpeeding = speed > 60;

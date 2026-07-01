@@ -30,14 +30,14 @@ public class RedisSink implements Serializable {
         }
         return jedisPool;
     }
-
+    // TODO here we have two values for distance? 
     public void store(TaxiSpeed speed) {
         try (Jedis jedis = getPool().getResource()) {
             String key = "taxi:speed:" + speed.taxiId;
             jedis.hset(key, "latitude",     String.valueOf(speed.latitude));
             jedis.hset(key, "longitude",    String.valueOf(speed.longitude));
             jedis.hset(key, "speed",        String.valueOf(speed.speed));
-            jedis.hset(key, "distance",     String.valueOf(speed.totalDistance));
+            jedis.hset(key, "distance",     String.valueOf(speed.curDistance));
             jedis.hset(key, "timestamp",    String.valueOf(speed.timestamp));
             jedis.hset(key, "isSpeeding",   String.valueOf(speed.isSpeeding));
             jedis.hset(key, "isOutOfArea",  String.valueOf(speed.isOutOfArea));
