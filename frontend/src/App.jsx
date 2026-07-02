@@ -432,7 +432,7 @@ function App() {
       })
       .then((data) => {
         if (cancelled) return;
-        setPathLocations([...data].reverse());
+        setPathLocations([...data]);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -485,18 +485,11 @@ function App() {
             t.taxi_id
           );
           if (String(selectedTaxiIdRef.current) === String(data.taxi.taxi_id)) {
-            const t = data.taxi;
             setPathLocations(prev => {
-              // Don't add duplicates
-              const last = prev[prev.length - 1];
-              if (
-                last &&
-                last.timestamp === t.timestamp
-              ) {
-                return prev;
-              }
 
               const updated = [
+
+                ...prev,
                 {
                   latitude: t.latitude,
                   longitude: t.longitude,
@@ -507,7 +500,6 @@ function App() {
                   isSpeeding: t.isSpeeding,
                   isParking: t.isParking,
                 },
-                ...prev
               ];
 
               return updated.slice(-PATH_LOCATIONS_LIMIT);
@@ -704,7 +696,7 @@ function App() {
                   pathOptions={{ color: '#1D4ED8', weight: 3, opacity: 0.7 }}
                 />
               )}
-
+              /*
               {selectedTaxiId !== null && normalizedPathLocations.map((p, idx) => (
                 <CircleMarker
                   key={`path-${selectedTaxiId}-${idx}`}
@@ -715,6 +707,7 @@ function App() {
                   <Popup>{p.timestamp}</Popup>
                 </CircleMarker>
               ))}
+              */
 
               {taxis.map((taxi) => {
                 const isSpeeding = taxi.isSpeeding;
