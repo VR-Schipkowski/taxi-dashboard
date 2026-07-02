@@ -1,4 +1,4 @@
-import {useState, useEffect, useRef, Component} from 'react';
+import {useState, useEffect, useRef} from 'react';
 import {MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap} from 'react-leaflet';
 import L from 'leaflet';
 import './App.css';
@@ -13,12 +13,11 @@ const wsLink = 'ws://localhost:5001';
 // const API_BASE = 'http://34.28.224.202:5001';
 const API_BASE = 'http://localhost:5001';
 
-
+// consts for path display
 const PATH_LOCATIONS_LIMIT = 30;
-const TIME_INTERVAL = 15 // in minutes
+const TIME_INTERVAL = 15; // in minutes
 
-
-
+// create icons per taxi
 function createDotIcon({ color, size = 14, variant = 'default', ring = false, ringColor }) {
   return L.divIcon({
     className: `taxi-dot-icon dot-${variant}`,
@@ -41,6 +40,7 @@ const TAG_STYLES = {
   taxiUpdate: {bg: '#E6F1FB', color: '#185FA5', dot: '#378ADD'},
 };
 
+// const for fading
 const STALE_AFTER_MS = 30 * 1000;
 
 function getOpacity(lastSeenTime, now) {
@@ -63,65 +63,7 @@ function RecenterMap({selectedTaxi}) {
 
   return null;
 }
-
-function TaxiSearchBox({ onSelect, onClear, selectedTaxiId }) {
-  const [value, setValue] = useState('');
-
-  function handleSubmit(e) {
-    e.preventDefault();
-    const trimmed = value.trim();
-    if (trimmed === '') return;
-    onSelect(trimmed);
-  }
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape' && selectedTaxiId !== null) {
-        setValue('');
-        onClear();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTaxiId, setValue, onClear]);
-
-  return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="select taxi"
-        style={{
-          padding: '4px 8px', fontSize: 13, border: '1px solid #d1d5db',
-          borderRadius: 4, width: 120,
-        }}
-      />
-      <button
-        type="submit"
-        style={{
-          padding: '4px 10px', fontSize: 13, border: '1px solid #d1d5db',
-          borderRadius: 4, background: '#fff', cursor: 'pointer',
-        }}
-      >
-        Search
-      </button>
-      {selectedTaxiId !== null && (
-        <button
-          type="button"
-          onClick={() => { setValue(''); onClear(); }}
-          style={{
-            padding: '4px 10px', fontSize: 13, border: '1px solid #d1d5db',
-            borderRadius: 4, background: '#fff', cursor: 'pointer', color: '#555',
-          }}
-        >
-          deselect
-        </button>
-      )}
-    </form>
-  );
-}
-
+// Taxi search box to  display taxi path
 function TaxiSearchBox({ onSelect, onClear, selectedTaxiId }) {
   const [value, setValue] = useState('');
 
@@ -340,19 +282,18 @@ function App() {
   const [latencyTrend, setLatencyTrend] = useState(null);
   const selectedTaxiIdRef = useRef(null);
 
-
-
   useEffect(() => {
-    selectedTaxiIdRef.current = selectedTaxiId; // hält die Ref synchron zum State
+    selectedTaxiIdRef.current = selectedTaxiId; // snychronizes ref to current state
   }, [selectedTaxiId]);
 
   //fadeout
   const [lastSeen, setLastSeen] = useState({});
   const [now, setNow] = useState(Date.now());
 
-  // Pfad (letzte N Standorte) des ausgewaehlten Taxis, aus der REST-API geladen.
+  // load last n locatoins per selected taxi
   const [pathLocations, setPathLocations] = useState([]);
   const [pathError, setPathError] = useState(null);
+
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(interval);
@@ -387,6 +328,7 @@ function App() {
     setTotalDistanceAll(total);
   }, [taxiMap]);
 
+  // clusters for better overview  
   function createClusterIcon(cluster) {
     const childMarkers = cluster.getAllChildMarkers();
     const count = childMarkers.length;
@@ -557,13 +499,14 @@ function App() {
             return newHistory;
           });
 
-          if (String(selectedTaxiIdRef.current) === String(t.taxi_id)) {
+          if (String(selectedTaxiIdRef.current) === String(data.taxi.taxi_id)) {
+            const t = data.taxi;
             setPathLocations(prev => {
               // Don't add duplicates
               const last = prev[prev.length - 1];
               if (
                 last &&
-                last.event_timestamp === t.event_timestamp
+                last.timestamp === t.timestamp
               ) {
                 return prev;
               }
@@ -572,43 +515,12 @@ function App() {
                 {
                   latitude: t.latitude,
                   longitude: t.longitude,
-                  event_timestamp: t.event_timestamp,
+                  timestamp: t.timestamp,
                   speed: t.speed,
-                  average_speed: t.average_speed,
-                  total_distance: t.total_distance,
-                  is_speeding: t.is_speeding,
-                  is_out_of_area: t.is_out_of_area,
-                  is_parking: t.is_parking,
-                },
-                ...prev
-              ];
-
-              return updated.slice(-PATH_LOCATIONS_LIMIT);
-            });
-          }
-
-          if (String(selectedTaxiIdRef.current) === String(t.taxi_id)) {
-            setPathLocations(prev => {
-              // Don't add duplicates
-              const last = prev[prev.length - 1];
-              if (
-                last &&
-                last.event_timestamp === t.event_timestamp
-              ) {
-                return prev;
-              }
-
-              const updated = [
-                {
-                  latitude: t.latitude,
-                  longitude: t.longitude,
-                  event_timestamp: t.event_timestamp,
-                  speed: t.speed,
-                  average_speed: t.average_speed,
-                  total_distance: t.total_distance,
-                  is_speeding: t.is_speeding,
-                  is_out_of_area: t.is_out_of_area,
-                  is_parking: t.is_parking,
+                  averageSpeed: t.averageSpeed,
+                  totalDistance: t.totalDistance,
+                  isSpeeding: t.isSpeeding,
+                  isParking: t.isParking,
                 },
                 ...prev
               ];
@@ -752,28 +664,13 @@ function App() {
             <strong>Latency:</strong> {latency !== null ? `${latency.toFixed(2)}s` : 'N/A'}
             {latencyTrend === 'up' && <span style={{color: '#dc2626', marginLeft: 4}}>↑</span>}
             {latencyTrend === 'down' && <span style={{color: '#16a34a', marginLeft: 4}}>↓</span>}
-        )}
+            </span>
         {pathError && (
           <span style={{ fontSize: 12, background: '#FAECE7', color: '#993C1D', padding: '2px 8px', borderRadius: 4 }}>
             {pathError}
           </span>
         )}
-        {speedingIncidents.length > 0 && (
-          <span style={{
-            fontSize: 12, background: '#FAECE7', color: '#993C1D',
-            padding: '2px 8px', borderRadius: 4, fontWeight: 500,
-          }}>
-            ⚠️ {speedingIncidents.length} speeding
-          </span>
-        )}
-        {areaViolations.length > 0 && (
-          <span style={{
-            fontSize: 12, background: '#FAEEDA', color: '#854F0B',
-            padding: '2px 8px', borderRadius: 4, fontWeight: 500,
-          }}>
-            🗺️ {areaViolations.length} area violations
-          </span>
-
+    
         </header>
 
         {/* Main content */}
@@ -814,7 +711,7 @@ function App() {
                 radius={4}
                 pathOptions={{ color: '#1D4ED8', fillColor: '#1D4ED8', fillOpacity: 0.6 }}
               >
-                <Popup>{p.event_timestamp}</Popup>
+                <Popup>{p.timestamp}</Popup>
               </CircleMarker>
             ))}
 
