@@ -1,5 +1,5 @@
 # Kafka Contract & Architecture Overview
-
+//TODO: UPDATE
 This file explains the architecture of the pipeline, the Kafka topic contracts,
 the WebSocket protocol, and who is responsible for what.
 Read this before starting any Stage 2 feature work.

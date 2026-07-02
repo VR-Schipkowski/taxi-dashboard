@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap } from 'react-leaflet';
+import {useState, useEffect, useRef, Component} from 'react';
+import {MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, useMap} from 'react-leaflet';
 import L from 'leaflet';
 import './App.css';
 import 'leaflet/dist/leaflet.css';
-import markerIconPng from 'leaflet/dist/images/marker-icon.png';
-import markerShadowPng from 'leaflet/dist/images/marker-shadow.png';
+import MarkerClusterGroup from 'react-leaflet-cluster';
+
+const wsLink = 'ws://localhost:5001';
+// const wsLink = 'ws://34.28.224.202:5001';
 // Todo: Refactor panels in seperate components
 // Todo maybe make a deployment branch which can be rebased from main, wich changes this const
 //change for deployment
@@ -17,54 +19,26 @@ const TIME_INTERVAL = 15 // in minutes
 
 
 
-const defaultIcon = L.icon({
-  iconUrl: markerIconPng,
-  shadowUrl: markerShadowPng,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-});
+function createDotIcon({ color, size = 14, variant = 'default', ring = false, ringColor }) {
+  return L.divIcon({
+    className: `taxi-dot-icon dot-${variant}`,
+    html: `<div class="taxi-dot" style="width:${size}px;height:${size}px;background:${color};${ring ? `box-shadow:0 0 0 3px ${ringColor}, 0 1px 3px rgba(0,0,0,0.4);` : ''}"></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2 - 6],
+  });
+}
 
-const speedingIcon = L.icon({
-  iconUrl: markerIconPng,
-  shadowUrl: markerShadowPng,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  className: 'speeding-marker',
-});
-
-const ooaIcon = L.icon({
-  iconUrl: markerIconPng,
-  shadowUrl: markerShadowPng,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  className: 'area-marker',
-});
-
-const parkingIcon = L.icon({
-  iconUrl: markerIconPng,
-  shadowUrl: markerShadowPng,
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  className: 'parking-marker',
-});
-
-const selectedIcon = L.icon({
-  iconUrl: markerIconPng,
-  shadowUrl: markerShadowPng,
-  iconSize: [32, 52],
-  iconAnchor: [16, 52],
-  popupAnchor: [1, -44],
-  className: 'selected-marker',
-});
+const defaultIcon = createDotIcon({ color: '#378ADD', variant: 'default' });
+const speedingIcon = createDotIcon({ color: '#E2462F', size: 16, variant: 'speeding' });
+const ooaIcon = createDotIcon({ color: '#1F9D55', size: 16, variant: 'area' });
+const parkingIcon = createDotIcon({ color: '#9CA3AF', variant: 'parking' });
+const selectedIcon = createDotIcon({ color: '#1D4ED8', size: 20, variant: 'selected', ring: true, ringColor: 'rgba(29,78,216,0.35)' });
 
 const TAG_STYLES = {
-  speeding: { bg: '#FAECE7', color: '#993C1D', dot: '#D85A30' },
-  area: { bg: '#FAEEDA', color: '#854F0B', dot: '#BA7517' },
-  taxiUpdate: { bg: '#E6F1FB', color: '#185FA5', dot: '#378ADD' },
+  speeding: {bg: '#FAECE7', color: '#993C1D', dot: '#D85A30'},
+  area: { bg: '#E6F6ED', color: '#1F7A43', dot: '#1F9D55' },
+  taxiUpdate: {bg: '#E6F1FB', color: '#185FA5', dot: '#378ADD'},
 };
 
 const STALE_AFTER_MS = 30 * 1000;
@@ -76,7 +50,7 @@ function getOpacity(lastSeenTime, now) {
   return 1 - age / STALE_AFTER_MS;
 }
 
-function RecenterMap({ selectedTaxi }) {
+function RecenterMap({selectedTaxi}) {
   const map = useMap();
 
   useEffect(() => {
@@ -148,7 +122,76 @@ function TaxiSearchBox({ onSelect, onClear, selectedTaxiId }) {
   );
 }
 
-function DebugAlerts({ entries, counts, filters, onToggleFilter, onClear, selectedTaxiId, onSelectTaxi }) {
+function TaxiSearchBox({ onSelect, onClear, selectedTaxiId }) {
+  const [value, setValue] = useState('');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const trimmed = value.trim();
+    if (trimmed === '') return;
+    onSelect(trimmed);
+  }
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && selectedTaxiId !== null) {
+        setValue('');
+        onClear();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTaxiId, setValue, onClear]);
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="select taxi"
+        style={{
+          padding: '4px 8px', fontSize: 13, border: '1px solid #d1d5db',
+          borderRadius: 4, width: 120,
+        }}
+      />
+      <button
+        type="submit"
+        style={{
+          padding: '4px 10px', fontSize: 13, border: '1px solid #d1d5db',
+          borderRadius: 4, background: '#fff', cursor: 'pointer',
+        }}
+      >
+        Search
+      </button>
+      {selectedTaxiId !== null && (
+        <button
+          type="button"
+          onClick={() => { setValue(''); onClear(); }}
+          style={{
+            padding: '4px 10px', fontSize: 13, border: '1px solid #d1d5db',
+            borderRadius: 4, background: '#fff', cursor: 'pointer', color: '#555',
+          }}
+        >
+          deselect
+        </button>
+      )}
+    </form>
+  );
+}
+
+function DebugAlerts({
+                       entries,
+                       counts,
+                       filters,
+                       onToggleFilter,
+                       onClear,
+                       selectedTaxiId,
+                       onSelectTaxi,
+                       activeFilters,
+                       speedingIncidents,
+                       areaViolations
+                     }) {
   const logRef = useRef(null);
 
   useEffect(() => {
@@ -164,106 +207,123 @@ function DebugAlerts({ entries, counts, filters, onToggleFilter, onClear, select
   });
 
   return (
-    <div style={{
-      width: 320,
-      flexShrink: 0,
-      display: 'flex',
-      flexDirection: 'column',
-      background: '#fff',
-      borderLeft: '1px solid #e5e7eb',
-      fontFamily: 'monospace',
-      fontSize: 12,
-    }}>
-      {/* Header */}
-      <div style={{ padding: '10px 12px', borderBottom: '1px solid #e5e7eb' }}>
-        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 8, color: '#111' }}>
-          Alerts{selectedTaxiId !== null ? ` — Taxi ${selectedTaxiId}` : ''}
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          {['speeding', 'area', 'taxiUpdate'].map(type => {
-            const s = TAG_STYLES[type];
-            const label = type === 'taxiUpdate' ? 'updates' : type;
-            return (
-              <button
-                key={type}
-                onClick={() => onToggleFilter(type)}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500,
-                  cursor: 'pointer', border: `1px solid ${s.dot}`,
-                  background: filters[type] ? s.bg : '#f3f4f6',
-                  color: filters[type] ? s.color : '#888',
-                  opacity: filters[type] ? 1 : 0.6,
-                  transition: 'all 0.15s',
-                }}
-              >
-                {label}
-                <span style={{
-                  background: 'rgba(0,0,0,0.12)', borderRadius: 999,
-                  padding: '0 5px', fontSize: 10,
-                }}>
+      <div style={{
+        width: 320,
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        background: '#fff',
+        borderLeft: '1px solid #e5e7eb',
+        fontFamily: 'monospace',
+        fontSize: 12,
+      }}>
+        {(activeFilters.speeding || activeFilters.area) && (
+            <div style={{padding: '8px 12px', borderBottom: '1px solid #e5e7eb', background: '#FAFAFA'}}>
+              <div style={{fontWeight: 600, fontSize: 12, marginBottom: 6}}>Current Violators</div>
+              {activeFilters.speeding && speedingIncidents.map(i => (
+                  <div key={`s-${i.taxiId}`} onClick={() => onSelectTaxi(i.taxiId)}
+                       style={{cursor: 'pointer', fontSize: 11, padding: '2px 0'}}>
+                    🚖 {i.taxiId} — {i.speed?.toFixed(1)} km/h
+                  </div>
+              ))}
+              {activeFilters.area && areaViolations.map(v => (
+                  <div key={`a-${v.taxiId}`} onClick={() => onSelectTaxi(v.taxiId)}
+                       style={{cursor: 'pointer', fontSize: 11, padding: '2px 0'}}>
+                    🚖 {v.taxiId} — outside permitted area
+                  </div>
+              ))}
+            </div>
+        )}
+        {/* Header */}
+        <div style={{padding: '10px 12px', borderBottom: '1px solid #e5e7eb'}}>
+          <div style={{fontWeight: 600, fontSize: 13, marginBottom: 8, color: '#111'}}>
+            Alerts
+          </div>
+          <div style={{display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center'}}>
+            {['speeding', 'area', 'taxiUpdate'].map(type => {
+              const s = TAG_STYLES[type];
+              const label = type === 'taxiUpdate' ? 'updates' : type;
+              return (
+                  <button
+                      key={type}
+                      onClick={() => onToggleFilter(type)}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 500,
+                        cursor: 'pointer', border: `1px solid ${s.dot}`,
+                        background: filters[type] ? s.bg : '#f3f4f6',
+                        color: filters[type] ? s.color : '#888',
+                        opacity: filters[type] ? 1 : 0.6,
+                        transition: 'all 0.15s',
+                      }}
+                  >
+                    {label}
+                    <span style={{
+                      background: 'rgba(0,0,0,0.12)', borderRadius: 999,
+                      padding: '0 5px', fontSize: 10,
+                    }}>
                   {counts[type]}
                 </span>
-              </button>
-            );
-          })}
-          <button
-            onClick={onClear}
-            style={{
-              marginLeft: 'auto', padding: '2px 8px', fontSize: 11,
-              border: '1px solid #d1d5db', borderRadius: 4,
-              background: 'transparent', cursor: 'pointer', color: '#555',
-            }}
-          >
-            clear
-          </button>
-        </div>
-      </div>
-
-      {/* Log */}
-      <div ref={logRef} style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
-        {visible.length === 0 ? (
-          <div style={{ padding: '2rem 1rem', textAlign: 'center', color: '#aaa' }}>
-            {selectedTaxiId !== null ? 'keine Alerts fuer dieses Taxi…' : 'waiting for events…'}
-          </div>
-        ) : (
-          visible.map((entry, i) => {
-            const s = TAG_STYLES[entry.type];
-            const clickable = entry.taxiId !== null && entry.taxiId !== undefined;
-            const selected = clickable && String(entry.taxiId) === String(selectedTaxiId);
-            return (
-              <div
-                key={i}
-                onClick={() => clickable && onSelectTaxi(entry.taxiId)}
+                  </button>
+              );
+            })}
+            <button
+                onClick={onClear}
                 style={{
-                  display: 'flex', gap: 8, padding: '5px 12px',
-                  borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start',
-                  cursor: clickable ? 'pointer' : 'default',
-                  background: selected ? '#EFF6FF' : 'transparent',
+                  marginLeft: 'auto', padding: '2px 8px', fontSize: 11,
+                  border: '1px solid #d1d5db', borderRadius: 4,
+                  background: 'transparent', cursor: 'pointer', color: '#555',
                 }}
-              >
-                <div style={{
-                  width: 7, height: 7, borderRadius: '50%',
-                  background: s.dot, marginTop: 4, flexShrink: 0,
-                }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div>
+            >
+              clear
+            </button>
+          </div>
+        </div>
+
+        {/* Log */}
+        <div ref={logRef} style={{flex: 1, overflowY: 'auto', padding: '4px 0'}}>
+          {visible.length === 0 ? (
+              <div style={{padding: '2rem 1rem', textAlign: 'center', color: '#aaa'}}>
+                waiting for events…
+              </div>
+          ) : (
+              visible.map((entry, i) => {
+                const s = TAG_STYLES[entry.type];
+                const clickable = entry.taxiId !== null && entry.taxiId !== undefined;
+                const selected = clickable && String(entry.taxiId) === String(selectedTaxiId);
+                return (
+                    <div
+                        key={i}
+                        onClick={() => clickable && onSelectTaxi(entry.taxiId)}
+                        style={{
+                          display: 'flex', gap: 8, padding: '5px 12px',
+                          borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start',
+                          cursor: clickable ? 'pointer' : 'default',
+                          background: selected ? '#EFF6FF' : 'transparent',
+                        }}
+                    >
+                      <div style={{
+                        width: 7, height: 7, borderRadius: '50%',
+                        background: s.dot, marginTop: 4, flexShrink: 0,
+                      }}/>
+                      <div style={{flex: 1, minWidth: 0}}>
+                        <div>
                     <span style={{
                       background: s.bg, color: s.color, fontSize: 10,
                       padding: '1px 5px', borderRadius: 3, marginRight: 5, fontWeight: 600,
                     }}>
                       {entry.type}
                     </span>
-                    <span style={{ color: '#222', wordBreak: 'break-all' }}>{entry.text}</span>
-                  </div>
-                  <div style={{ color: '#aaa', fontSize: 10, marginTop: 2 }}>{entry.ts}</div>
-                </div>
-              </div>
-            );
-          })
-        )}
+                          <span style={{color: '#222', wordBreak: 'break-all'}}>{entry.text}</span>
+                        </div>
+                        <div style={{color: '#aaa', fontSize: 10, marginTop: 2}}>{entry.ts}</div>
+                      </div>
+                    </div>
+                );
+              })
+          )}
+        </div>
       </div>
-    </div>
   );
 }
 
@@ -273,6 +333,11 @@ function App() {
   const [areaViolations, setAreaViolations] = useState([]);
   const [status, setStatus] = useState('Connecting...');
   const [selectedTaxiId, setSelectedTaxiId] = useState(null);
+  const [totalDistanceAll, setTotalDistanceAll] = useState(null);
+  // states for latency display
+  const [latency, setLatency] = useState(null);
+  const [latencyHistory, setLatencyHistory] = useState([]);
+  const [latencyTrend, setLatencyTrend] = useState(null);
   const selectedTaxiIdRef = useRef(null);
 
 
@@ -281,37 +346,116 @@ function App() {
     selectedTaxiIdRef.current = selectedTaxiId; // hält die Ref synchron zum State
   }, [selectedTaxiId]);
 
+  //fadeout
   const [lastSeen, setLastSeen] = useState({});
   const [now, setNow] = useState(Date.now());
 
   // Pfad (letzte N Standorte) des ausgewaehlten Taxis, aus der REST-API geladen.
   const [pathLocations, setPathLocations] = useState([]);
   const [pathError, setPathError] = useState(null);
-
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
+    const interval = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(interval);
   }, []);
 
+  //batch updates
+  const pendingUpdates = useRef({});
+  useEffect(() => {
+    const flush = setInterval(() => {
+      const updates = pendingUpdates.current;
+      if (Object.keys(updates).length === 0) return;
+      pendingUpdates.current = {};
+      const updateTime = Date.now();
+      setTaxiMap(prev => ({...prev, ...updates}));
+      setLastSeen(prev => {
+        const next = {...prev};
+        Object.keys(updates).forEach(id => {
+          next[id] = updateTime;
+        });
+        return next;
+      });
+    }, 3000);
+    return () => clearInterval(flush);
+  }, []);
+
+  //get total distance travelled
+  useEffect(() => {
+    const total = Object.values(taxiMap).reduce(
+      (sum, taxi) => sum + (taxi.totalDistance || 0),
+      0
+    );
+    setTotalDistanceAll(total);
+  }, [taxiMap]);
+
+  function createClusterIcon(cluster) {
+    const childMarkers = cluster.getAllChildMarkers();
+    const count = childMarkers.length;
+
+    let hasSpeeding = false;
+    let hasArea = false;
+    childMarkers.forEach(m => {
+      const cls = m.options.icon?.options?.className || '';
+      if (cls.includes('dot-speeding')) hasSpeeding = true;
+      else if (cls.includes('dot-area')) hasArea = true;
+    });
+
+    let variant = 'normal';
+    if (hasSpeeding) variant = 'speeding';
+    else if (hasArea) variant = 'area';
+
+    let size, sizeTier;
+    if (count < 10) { size = 36; sizeTier = 'sm'; }
+    else if (count < 50) { size = 44; sizeTier = 'md'; }
+    else { size = 52; sizeTier = 'lg'; }
+
+    return L.divIcon({
+      html: `<div class="cluster-inner">${count}</div>`,
+      className: `taxi-cluster cluster-${variant} cluster-${sizeTier}`,
+      iconSize: L.point(size, size),
+    });
+  }
+
+  //filtering
+  const [activeFilters, setActiveFilters] = useState({speeding: false, area: false});
+
+  function toggleViolationFilter(type) {
+    setActiveFilters(prev => ({...prev, [type]: !prev[type]}));
+  }
+
+  function normalizeAlarmTaxi(a) {
+    return {
+      taxi_id: String(a.taxiId),
+      latitude: a.latitude,
+      longitude: a.longitude,
+      speed: a.speed,
+      averageSpeed: a.averageSpeed,
+      distance: a.totalDistance,
+      timestamp: a.timestamp,
+      isSpeeding: a.isSpeeding,
+      isParking: a.isParking,
+      _opacity: 1,
+    };
+  }
+
   // Debug alerts state
   const [debugEntries, setDebugEntries] = useState([]);
-  const [debugCounts, setDebugCounts] = useState({ speeding: 0, area: 0, taxiUpdate: 0 });
-  const [debugFilters, setDebugFilters] = useState({ speeding: true, area: true, taxiUpdate: true });
+  const [debugCounts, setDebugCounts] = useState({speeding: 0, area: 0, taxiUpdate: 0});
+  const [debugFilters, setDebugFilters] = useState({speeding: true, area: true, taxiUpdate: true});
 
   function addDebugEntry(type, text, taxiId = null) {
     const now = new Date();
     const ts = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
-    setDebugEntries(prev => [{ type, text, ts, taxiId }, ...prev].slice(0, 300));
-    setDebugCounts(prev => ({ ...prev, [type]: prev[type] + 1 }));
+    setDebugEntries(prev => [{type, text, ts, taxiId}, ...prev].slice(0, 300));
+    setDebugCounts(prev => ({...prev, [type]: prev[type] + 1}));
   }
 
   function toggleFilter(type) {
-    setDebugFilters(prev => ({ ...prev, [type]: !prev[type] }));
+    setDebugFilters(prev => ({...prev, [type]: !prev[type]}));
   }
 
   function clearDebug() {
     setDebugEntries([]);
-    setDebugCounts({ speeding: 0, area: 0, taxiUpdate: 0 });
+    setDebugCounts({speeding: 0, area: 0, taxiUpdate: 0});
   }
 
   function selectTaxiFromAlert(taxiId) {
@@ -359,11 +503,12 @@ function App() {
   }, [selectedTaxiId]);
 
   useEffect(() => {
-    const socket = new WebSocket(API_BASE);
+    const socket = new WebSocket(wsLink);
 
     socket.onopen = () => setStatus('Connected – Live-Stream active');
 
     socket.onmessage = (event) => {
+      console.log(event.data);
       try {
         const data = JSON.parse(event.data);
 
@@ -371,22 +516,76 @@ function App() {
           const map = {};
           const seen = {};
           const receivedAt = Date.now();
-          (data.taxis || []).forEach(t => { map[t.taxi_id] = t; seen[t.taxi_id] = receivedAt; });
+          (data.taxis || []).forEach(t => {
+            map[t.taxi_id] = t;
+            seen[t.taxi_id] = receivedAt;
+          });
           setTaxiMap(map);
           setLastSeen(seen);
           setSpeedingIncidents(data.speedingIncidents || []);
           setAreaViolations(data.areaViolations || []);
           addDebugEntry('taxiUpdate', `snapshot — ${data.taxis.length} taxis loaded`);
+          
+          // Extract latency from initial snapshot and convert ms to seconds
+          if (data.stats && data.stats.avgLatencyMs) {
+            const initialLatency = data.stats.avgLatencyMs / 1000;
+            setLatency(initialLatency);
+            setLatencyHistory([initialLatency]);
+          }
 
         } else if (data.type === 'taxiUpdate') {
           const t = data.taxi;
-          setTaxiMap(prev => ({ ...prev, [t.taxi_id]: t }));
-          setLastSeen(prev => ({ ...prev, [t.taxi_id]: Date.now() }));
+          setTaxiMap(prev => ({...prev, [t.taxi_id]: t}));
+          setLastSeen(prev => ({...prev, [t.taxi_id]: Date.now()}));
           addDebugEntry(
-            'taxiUpdate',
-            `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? ' ⚡' : ''}${t.isParking ? ' 🅿' : ''}`,
-            t.taxi_id
+              'taxiUpdate',
+              `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? ' ⚡' : ''}${t.isParking ? ' 🅿' : ''}`,
+              t.taxi_id
           );
+        
+        } else if (data.type === 'latencyStats') {
+          const newLatency = data.stats.avgLatencyMs / 1000; // Convert ms to seconds
+          setLatency(newLatency);
+          
+          // Track trend by comparing with last values
+          setLatencyHistory(prev => {
+            const newHistory = [...prev, newLatency].slice(-5); // Keep last 5 values
+            if (newHistory.length >= 2) {
+              const previous = newHistory[newHistory.length - 2];
+              setLatencyTrend(newLatency > previous ? 'up' : newLatency < previous ? 'down' : null);
+            }
+            return newHistory;
+          });
+
+          if (String(selectedTaxiIdRef.current) === String(t.taxi_id)) {
+            setPathLocations(prev => {
+              // Don't add duplicates
+              const last = prev[prev.length - 1];
+              if (
+                last &&
+                last.event_timestamp === t.event_timestamp
+              ) {
+                return prev;
+              }
+
+              const updated = [
+                {
+                  latitude: t.latitude,
+                  longitude: t.longitude,
+                  event_timestamp: t.event_timestamp,
+                  speed: t.speed,
+                  average_speed: t.average_speed,
+                  total_distance: t.total_distance,
+                  is_speeding: t.is_speeding,
+                  is_out_of_area: t.is_out_of_area,
+                  is_parking: t.is_parking,
+                },
+                ...prev
+              ];
+
+              return updated.slice(-PATH_LOCATIONS_LIMIT);
+            });
+          }
 
           if (String(selectedTaxiIdRef.current) === String(t.taxi_id)) {
             setPathLocations(prev => {
@@ -419,14 +618,22 @@ function App() {
           }
 
         } else if (data.type === 'speedingAlert') {
-          const i = data.incident;
+          const i = data.speedingIncidents;
           setSpeedingIncidents(data.speedingIncidents || []);
-          addDebugEntry('speeding', `taxi ${i.taxiId} — ${i.speed.toFixed(1)} km/h`, i.taxiId);
+          i.forEach(i => {
+            addDebugEntry(
+                'speeding',
+                `taxi ${i.taxiId} — ${i.speed.toFixed(1)} km/h`,
+                i.taxiId
+            );
+          });
 
         } else if (data.type === 'areaViolation') {
-          const v = data.violation;
+          const v = data.areaViolations;
           setAreaViolations(data.areaViolations || []);
-          addDebugEntry('area', `taxi ${v.taxiId} outside permitted area`, v.taxiId);
+          v.forEach(violation => {
+            addDebugEntry('area', `taxi ${violation.taxiId} outside permitted area`, violation.taxiId);
+          });
         }
 
       } catch (error) {
@@ -442,15 +649,33 @@ function App() {
   const allTaxis = Object.values(taxiMap);
 
   const violatingTaxiIds = new Set(areaViolations.map(v => String(v.taxiId)));
+  const speedingTaxiIds = new Set(speedingIncidents.map(i => String(i.taxiId)));
 
   const visibleTaxis = allTaxis
-    .map(t => ({ ...t, _opacity: getOpacity(lastSeen[t.taxi_id], now) }))
-    .filter(t => t._opacity > 0);
+      .map(t => ({...t, _opacity: getOpacity(lastSeen[t.taxi_id], now)}))
+      .filter(t => t._opacity > 0);
 
-  // only show selected
+  const hasActiveFilter = activeFilters.speeding || activeFilters.area;
+
+  const violatorMap = {};
+  if (activeFilters.speeding) {
+    speedingIncidents.forEach(i => {
+      violatorMap[i.taxiId] = normalizeAlarmTaxi(i);
+    });
+  }
+  if (activeFilters.area) {
+    areaViolations.forEach(v => {
+      violatorMap[v.taxiId] = {...violatorMap[v.taxiId], ...normalizeAlarmTaxi(v)};
+    });
+  }
+
+  const filteredByViolation = !hasActiveFilter
+      ? visibleTaxis
+      : Object.values(violatorMap);
+
   const taxis = selectedTaxiId === null
-    ? visibleTaxis
-    : visibleTaxis.filter(t => String(t.taxi_id) === String(selectedTaxiId));
+      ? filteredByViolation
+      : filteredByViolation.filter(t => String(t.taxi_id) === String(selectedTaxiId));
   const isConnected = status.includes('active') || status.includes('aktiv');
 
   const normalizedPathLocations = pathLocations
@@ -464,28 +689,69 @@ function App() {
   const pathPositions = normalizedPathLocations.map((p) => [p.latitude, p.longitude]);
 
   return (
-    <div style={{ padding: 0, fontFamily: 'sans-serif', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Header */}
-      <header style={{
-        padding: '10px 16px', display: 'flex', alignItems: 'center',
-        gap: 12, borderBottom: '1px solid #e5e7eb', flexShrink: 0,
-        background: '#fff', flexWrap: 'wrap',
-      }}>
-        <h1 style={{ margin: 0, fontSize: 18 }}>🚖 Taxi Live-Tracker</h1>
-        <span style={{ fontSize: 13, color: '#555' }}>
+      <div style={{padding: 0, fontFamily: 'sans-serif', height: '100vh', display: 'flex', flexDirection: 'column'}}>
+        {/* Header */}
+        <header style={{
+          padding: '10px 16px', display: 'flex', alignItems: 'center',
+          gap: 12, borderBottom: '1px solid #e5e7eb', flexShrink: 0,
+          background: '#fff',
+        }}>
+          <h1 style={{margin: 0, fontSize: 18}}>🚖 Taxi Live-Tracker</h1>
+          <span style={{fontSize: 13, color: '#555'}}>
           <strong>Status:</strong>{' '}
-          <span style={{ color: isConnected ? '#16a34a' : '#dc2626' }}>{status}</span>
+            <span style={{color: isConnected ? '#16a34a' : '#dc2626'}}>{status}</span>
         </span>
-        <span style={{ fontSize: 13, color: '#555' }}>
+          <span style={{fontSize: 13, color: '#555'}}>
           <strong>Active:</strong> {visibleTaxis.length}
         </span>
-
+          <span style={{fontSize: 13, color: '#555'}}>
+          <strong>Total distance travelled:</strong> {totalDistanceAll != null ? `${totalDistanceAll.toFixed(1)} km` : 'N/A'}
+        </span>
+  
         <TaxiSearchBox onSelect={selectTaxi} onClear={clearSelection} selectedTaxiId={selectedTaxiId} />
 
         {selectedTaxiId !== null && (
-          <span style={{ fontSize: 12, background: '#EFF6FF', color: '#1D4ED8', padding: '2px 8px', borderRadius: 4, fontWeight: 500 }}>
+              <span style={{
+                fontSize: 12,
+                background: '#EFF6FF',
+                color: '#1D4ED8',
+                padding: '2px 8px',
+                borderRadius: 4,
+                fontWeight: 500
+              }}>
             focused taxi: {selectedTaxiId}
           </span>
+          )}
+          {speedingIncidents.length > 0 && (
+              <button
+                  onClick={() => toggleViolationFilter('speeding')}
+                  style={{
+                    fontSize: 12, fontWeight: 500, borderRadius: 4, cursor: 'pointer',
+                    border: '1px solid #1F9D55', padding: '2px 8px',
+                    background: activeFilters.speeding ? '#993C1D' : '#FAECE7',
+                    color: activeFilters.speeding ? '#fff' : '#993C1D',
+                  }}
+              >
+                ⚠️ {speedingIncidents.length} speeding
+              </button>
+          )}
+          {areaViolations.length > 0 && (
+              <button
+                  onClick={() => toggleViolationFilter('area')}
+                  style={{
+                    fontSize: 12, fontWeight: 500, borderRadius: 4, cursor: 'pointer',
+                    border: '1px solid #1F9D55', padding: '2px 8px',
+                    background: activeFilters.area ? '#1F7A43' : '#E6F6ED',
+                    color: activeFilters.area ? '#fff' : '#1F7A43',
+                  }}
+              >
+                🗺️ {areaViolations.length} area violations
+              </button>
+          )}
+            <span style={{fontSize: 13, color: '#555'}}>
+            <strong>Latency:</strong> {latency !== null ? `${latency.toFixed(2)}s` : 'N/A'}
+            {latencyTrend === 'up' && <span style={{color: '#dc2626', marginLeft: 4}}>↑</span>}
+            {latencyTrend === 'down' && <span style={{color: '#16a34a', marginLeft: 4}}>↓</span>}
         )}
         {pathError && (
           <span style={{ fontSize: 12, background: '#FAECE7', color: '#993C1D', padding: '2px 8px', borderRadius: 4 }}>
@@ -507,25 +773,32 @@ function App() {
           }}>
             🗺️ {areaViolations.length} area violations
           </span>
-        )}
 
-      </header>
+        </header>
 
-      {/* Main content */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-        {/* Map */}
-        <div style={{ flex: 1, overflow: 'hidden' }}>
-          <MapContainer
-            center={[39.9042, 116.4074]}
-            zoom={12}
-            style={{ height: '100%', width: '100%' }}
-          >
-            <RecenterMap selectedTaxi={selectedTaxiId === null ? null : taxiMap[selectedTaxiId]} />
-            <TileLayer
-              attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-
+        {/* Main content */}
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          {/* Map */}
+          <div style={{ flex: 1, overflow: 'hidden'}}>
+            <MapContainer
+                center={[39.9042, 116.4074]}
+                zoom={12}
+                style={{height: '100%', width: '100%'}}
+            >
+              <RecenterMap selectedTaxi={selectedTaxiId === null ? null : taxiMap[selectedTaxiId]}/>
+              <TileLayer
+                  attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <MarkerClusterGroup
+                  chunkedLoading
+                  iconCreateFunction={createClusterIcon}
+                  maxClusterRadius={60}
+                  spiderfyOnMaxZoom={true}
+                  disableClusteringAtZoom={16}
+                  showCoverageOnHover={false}
+              >
+    
             {selectedTaxiId !== null && pathPositions.length > 1 && (
               <Polyline
                 key={`poly-${selectedTaxiId}`}
@@ -546,59 +819,64 @@ function App() {
             ))}
 
             {taxis.map((taxi) => {
-              const isSpeeding = taxi.isSpeeding;
-              const isOutOfArea = violatingTaxiIds.has(String(taxi.taxi_id));
+                  const isSpeeding = taxi.isSpeeding;
+                  const isOutOfArea = violatingTaxiIds.has(String(taxi.taxi_id));
 
-              let icon;
-              if (selectedTaxiId !== null && String(taxi.taxi_id) === String(selectedTaxiId)) {
-                icon = selectedIcon;
-              } else if (isSpeeding) {
-                icon = speedingIcon;
-              } else if (isOutOfArea) {
-                icon = ooaIcon;
-              } else if (taxi.isParking) {
-                icon = parkingIcon;
-              } else {
-                icon = defaultIcon;
-              }
+                  let icon;
+                  if (selectedTaxiId !== null && String(taxi.taxi_id) === String(selectedTaxiId)) {
+                    icon = selectedIcon;
+                  } else if (isSpeeding) {
+                    icon = speedingIcon;
+                  } else if (isOutOfArea) {
+                    icon = ooaIcon;
+                  } else if (taxi.isParking) {
+                    icon = parkingIcon;
+                  } else {
+                    icon = defaultIcon;
+                  }
 
-              return (
-                <Marker
-                  key={taxi.taxi_id}
-                  position={[taxi.latitude, taxi.longitude]}
-                  opacity={taxi._opacity}
-                  icon={icon}
-                  eventHandlers={{ click: () => selectTaxi(taxi.taxi_id) }}
+                  return (
+                    <Marker
+                      key={taxi.taxi_id}
+                      position={[taxi.latitude, taxi.longitude]}
+                      opacity={taxi._opacity}
+                      icon={icon}
+                      eventHandlers={{ click: () => selectTaxi(taxi.taxi_id) }}
                 >
-                  <Popup>
-                    <div style={{ fontSize: 14 }}>
-                      <strong>Taxi ID:</strong> {taxi.taxi_id}<br />
-                      <strong>Timestamp:</strong> {taxi.timestamp}<br />
-                      <strong>Average Speed:</strong> {taxi.averageSpeed?.toFixed(1)} km/h<br />
-                      <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
-                      {isSpeeding ? ' ⚠️ Speeding!' : ''}<br />
-                      <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km<br />
-                      {isOutOfArea ? ' ⚠️ Out of Area!' : ''}
-                    </div>
-                  </Popup>
-                </Marker>
-              );
-            })}
-          </MapContainer>
-        </div>
+                      <Popup>
+                        <div style={{fontSize: 14}}>
+                          <strong>Taxi ID:</strong> {taxi.taxi_id}<br/>
+                          <strong>Timestamp:</strong> {taxi.timestamp}<br/>
+                          <strong>Average
+                              Speed:</strong> {taxi.averageSpeed?.toFixed(1)} km/h<br/>
+                          <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
+                          {isSpeeding ? ' ⚠️ Speeding!' : ''}<br/>
+                          <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km<br/>
+                          {isOutOfArea ? ' ⚠️ Out of Area!' : ''}
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+              </MarkerClusterGroup>
+            </MapContainer>
+          </div>
 
-        {/* Debug panel */}
-        <DebugAlerts
-          entries={debugEntries}
-          counts={debugCounts}
-          filters={debugFilters}
-          onToggleFilter={toggleFilter}
-          onClear={clearDebug}
-          selectedTaxiId={selectedTaxiId}
-          onSelectTaxi={selectTaxiFromAlert}
-        />
+          {/* Debug panel */}
+          <DebugAlerts
+              entries={debugEntries}
+              counts={debugCounts}
+              filters={debugFilters}
+              onToggleFilter={toggleFilter}
+              onClear={clearDebug}
+              selectedTaxiId={selectedTaxiId}
+              onSelectTaxi={selectTaxiFromAlert}
+              activeFilters={activeFilters}
+              speedingIncidents={speedingIncidents}
+              areaViolations={areaViolations}
+          />
+        </div>
       </div>
-    </div>
   );
 }
 

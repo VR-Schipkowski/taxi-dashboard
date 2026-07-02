@@ -229,3 +229,36 @@
   filter: hue-rotate(230deg) saturate(6) brightness(1);
   opacity: 1;
 }
+
+.taxi-dot-icon { background: transparent; border: none; }
+.taxi-dot {
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dot-selected .taxi-dot {
+    animation: taxi-pulse 1.6s ease-out infinite;
+  }
+}
+@keyframes taxi-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(29,78,216,0.45); }
+  70% { box-shadow: 0 0 0 10px rgba(29,78,216,0); }
+  100% { box-shadow: 0 0 0 0 rgba(29,78,216,0); }
+}
+
+.taxi-cluster { display: flex; align-items: center; justify-content: center; }
+.taxi-cluster .cluster-inner {
+  width: 100%; height: 100%; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: sans-serif; font-weight: 600; color: #fff;
+  border: 2px solid rgba(255,255,255,0.85);
+}
+.cluster-sm .cluster-inner { font-size: 12px; }
+.cluster-md .cluster-inner { font-size: 13px; }
+.cluster-lg .cluster-inner { font-size: 14px; }
+
+.cluster-normal .cluster-inner   { background: #378ADD; box-shadow: 0 0 0 4px rgba(55,138,221,0.25); }
+.cluster-speeding .cluster-inner { background: #E2462F; box-shadow: 0 0 0 4px rgba(226,70,47,0.3); }
+.cluster-area .cluster-inner     { background: #1F9D55; box-shadow: 0 0 0 4px rgba(31,157,85,0.3); }

@@ -15,10 +15,9 @@ const wss = new WebSocketServer({ server });
 
 const kafka = new Kafka({ brokers: ['kafka:9092'] });
 
-const ALARM_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
-const speedingIncidents = new Map(); // taxiId -> incident
-const areaViolations = new Map();    // taxiId -> violation
+let speedingIncidents = [];
+let areaViolations = [];
+ // taxiId -> violation
 
 // Rolling window of recent end-to-end latencies (ms) for the dashboard health panel.
 // Each taxi-processed event carries ingestedAt (provider publish time); latency is
@@ -46,24 +45,6 @@ setInterval(() => {
         console.log(`[Latency] avg ${stats.avgLatencyMs}ms p95 ${stats.p95LatencyMs}ms (n=${recentLatencies.length})`);
     }
 }, 5000);
-
-function pruneExpired(map, ttl) {
-    const cutoff = Date.now() - ttl;
-    let changed = false;
-    for (const [taxiId, entry] of map) {
-        if (entry.receivedAt < cutoff) {
-            map.delete(taxiId);
-            changed = true;
-        }
-    }
-    return changed;
-}
-setInterval(() => {
-    const speedingChanged = pruneExpired(speedingIncidents, ALARM_TTL_MS);
-    const violationsChanged = pruneExpired(areaViolations, ALARM_TTL_MS);
-    if (speedingChanged) broadcast({ type: 'alarmsSync', kind: 'speeding', speedingIncidents: Array.from(speedingIncidents.values()) });
-    if (violationsChanged) broadcast({ type: 'alarmsSync', kind: 'area', areaViolations: Array.from(areaViolations.values()) });
-}, 30_000);
 // DEBUG ENDPOINT - remove before production
 app.get('/debug', async (req, res) => {
     const keys = await redis.keys('taxi:speed:*');
@@ -116,7 +97,8 @@ function broadcast(payload) {
 async function buildSnapshot() {
     const keys = await redis.keys('taxi:speed:*');
     const taxis = [];
-    let totalDistance = 0;
+    // TODO: check why is this done?
+    let totalDistanceAll = 0;
     for (const key of keys) {
         const data = await redis.hgetall(key);
         if (data && data.latitude && data.longitude) {
@@ -125,6 +107,7 @@ async function buildSnapshot() {
                 latitude: parseFloat(data.latitude),
                 longitude: parseFloat(data.longitude),
                 speed: parseFloat(data.speed),
+                // TODO: have two times the same distance, need to change that
                 distance: parseFloat(data.distance),
                 timestamp: data.timestamp,
                 isSpeeding: data.isSpeeding === 'true',
@@ -133,21 +116,21 @@ async function buildSnapshot() {
                 lastMoved: data.lastMoved && data.lastMoved !== 'null' ? data.lastMoved : '',
                 isParking: data.isParking === 'true'
             });
-            totalDistance += parseFloat(data.distance) || 0;
+            totalDistanceAll += parseFloat(data.totalDistance) || 0;
         }
     }
-    return { taxis, totalDistance };
+    return { taxis, totalDistanceAll };
 }
 
 // New client connects — send full snapshot from Redis so map is not empty
 wss.on('connection', async (ws) => {
-    const { taxis, totalDistance } = await buildSnapshot();
+    const { taxis, totalDistanceAll } = await buildSnapshot();
     ws.send(JSON.stringify({
         type: 'snapshot',
         taxis,
-        stats: { activeTaxiCount: taxis.length, totalDistance, ...latencyStats() },
-        speedingIncidents: Array.from(speedingIncidents.values()),
-        areaViolations: Array.from(areaViolations.values())
+        stats: { activeTaxiCount: taxis.length, totalDistanceAll, ...latencyStats() },
+        speedingIncidents,
+        areaViolations
     }));
 });
 
@@ -186,14 +169,8 @@ async function startConsumers() {
     await speedingConsumer.subscribe({ topic: 'taxi-speeding', fromBeginning: false });
     await speedingConsumer.run({
         eachMessage: async ({ message }) => {
-            const event = JSON.parse(message.value.toString());
-            const incident = { taxiId: event.taxiId, speed: event.speed, timestamp: event.timestamp, receivedAt: Date.now() };
-            speedingIncidents.set(event.taxiId, incident);
-            broadcast({
-                type: 'speedingAlert',
-                incident,
-                speedingIncidents: Array.from(speedingIncidents.values())
-            });
+            speedingIncidents = JSON.parse(message.value.toString());
+            broadcast({ type: 'speedingAlert', speedingIncidents });
         }
     });
 
@@ -204,18 +181,8 @@ async function startConsumers() {
     await violationsConsumer.subscribe({ topic: 'taxi-area-violations', fromBeginning: false });
     await violationsConsumer.run({
         eachMessage: async ({ message }) => {
-            const event = JSON.parse(message.value.toString());
-            const violation = {
-                taxiId: event.taxiId,
-                timestamp: event.timestamp,
-                receivedAt: Date.now()
-            };
-            areaViolations.set(event.taxiId, violation);
-            broadcast({
-                type: 'areaViolation',
-                violation,
-                areaViolations: Array.from(areaViolations.values())
-            });
+            areaViolations = JSON.parse(message.value.toString());
+            broadcast({ type: 'areaViolation', areaViolations });
         }
     });
 }
