@@ -73,26 +73,34 @@ app.get('/debug', async (req, res) => {
     }
     res.json(result);
 });
-// wrapper for db calls to taxi-api
-app.get('/taxis/:id/locations', async (req, res) => {
+// Wrapper for taxi-api
+app.get("/taxis/:id/locations", async (req, res) => {
     const { id } = req.params;
-    const limit = req.query.limit || 10;
+
+    const timeInterval = Number(req.query.time_interval) || 15;
+    const number = Number(req.query.number) || 10;
 
     try {
         const upstream = await fetch(
-            `${TAXI_API_URL}/taxis/${encodeURIComponent(id)}/locations?limit=${encodeURIComponent(limit)}`
+            `${TAXI_API_URL}/taxis/${encodeURIComponent(id)}/times?time_interval=${encodeURIComponent(timeInterval)}&number=${encodeURIComponent(number)}`
         );
 
+        const body = await upstream.json().catch(() => null);
+
         if (!upstream.ok) {
-            const detail = await upstream.text().catch(() => '');
-            return res.status(upstream.status).json({ error: 'taxi-api error', detail });
+            return res.status(upstream.status).json(
+                body || {
+                    error: "taxi-api error",
+                }
+            );
         }
 
-        const data = await upstream.json();
-        res.json(data);
+        res.json(body);
     } catch (err) {
-        console.error('Fehler beim Aufruf von taxi-api:', err);
-        res.status(502).json({ error: 'taxi-api nicht erreichbar' });
+        console.error("Error calling taxi-api:", err);
+        res.status(502).json({
+            error: "taxi-api unreachable",
+        });
     }
 });
 

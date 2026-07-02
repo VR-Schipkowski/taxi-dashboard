@@ -12,7 +12,10 @@ import markerShadowPng from 'leaflet/dist/images/marker-shadow.png';
 const API_BASE = 'http://localhost:5001';
 
 
-const PATH_LOCATIONS_LIMIT = 20;
+const PATH_LOCATIONS_LIMIT = 30;
+const TIME_INTERVAL = 15 // in minutes
+
+
 
 const defaultIcon = L.icon({
   iconUrl: markerIconPng,
@@ -96,6 +99,17 @@ function TaxiSearchBox({ onSelect, onClear, selectedTaxiId }) {
     if (trimmed === '') return;
     onSelect(trimmed);
   }
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && selectedTaxiId !== null) {
+        setValue('');
+        onClear();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTaxiId, setValue, onClear]);
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -116,7 +130,7 @@ function TaxiSearchBox({ onSelect, onClear, selectedTaxiId }) {
           borderRadius: 4, background: '#fff', cursor: 'pointer',
         }}
       >
-        Suchen
+        Search
       </button>
       {selectedTaxiId !== null && (
         <button
@@ -140,6 +154,7 @@ function DebugAlerts({ entries, counts, filters, onToggleFilter, onClear, select
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = 0;
   }, [entries.length]);
+
 
   // Only show selected taxi allerts
   const visible = entries.filter(e => {
@@ -258,6 +273,13 @@ function App() {
   const [areaViolations, setAreaViolations] = useState([]);
   const [status, setStatus] = useState('Connecting...');
   const [selectedTaxiId, setSelectedTaxiId] = useState(null);
+  const selectedTaxiIdRef = useRef(null);
+
+
+
+  useEffect(() => {
+    selectedTaxiIdRef.current = selectedTaxiId; // hält die Ref synchron zum State
+  }, [selectedTaxiId]);
 
   const [lastSeen, setLastSeen] = useState({});
   const [now, setNow] = useState(Date.now());
@@ -317,21 +339,20 @@ function App() {
     let cancelled = false;
     setPathError(null);
 
-    fetch(`${API_BASE}/taxis/${selectedTaxiId}/locations?limit=${PATH_LOCATIONS_LIMIT}`)
+    fetch(`${API_BASE}/taxis/${selectedTaxiId}/locations?time_interval=${TIME_INTERVAL}&number=${PATH_LOCATIONS_LIMIT}`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
       .then((data) => {
         if (cancelled) return;
-        // API liefert neueste zuerst -> fuer den Pfad chronologisch (aeltest -> neuest) umdrehen.
         setPathLocations([...data].reverse());
       })
       .catch((err) => {
         if (cancelled) return;
-        console.error('Fehler beim Laden des Pfads:', err);
+        console.error('error loading path:', err);
         setPathLocations([]);
-        setPathError('Konnte Standorte nicht laden');
+        setPathError('could not load');
       });
 
     return () => { cancelled = true; };
@@ -366,6 +387,36 @@ function App() {
             `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? ' ⚡' : ''}${t.isParking ? ' 🅿' : ''}`,
             t.taxi_id
           );
+
+          if (String(selectedTaxiIdRef.current) === String(t.taxi_id)) {
+            setPathLocations(prev => {
+              // Don't add duplicates
+              const last = prev[prev.length - 1];
+              if (
+                last &&
+                last.event_timestamp === t.event_timestamp
+              ) {
+                return prev;
+              }
+
+              const updated = [
+                {
+                  latitude: t.latitude,
+                  longitude: t.longitude,
+                  event_timestamp: t.event_timestamp,
+                  speed: t.speed,
+                  average_speed: t.average_speed,
+                  total_distance: t.total_distance,
+                  is_speeding: t.is_speeding,
+                  is_out_of_area: t.is_out_of_area,
+                  is_parking: t.is_parking,
+                },
+                ...prev
+              ];
+
+              return updated.slice(-PATH_LOCATIONS_LIMIT);
+            });
+          }
 
         } else if (data.type === 'speedingAlert') {
           const i = data.incident;

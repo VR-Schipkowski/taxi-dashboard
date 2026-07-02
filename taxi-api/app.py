@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import threading
+from datetime import datetime
 from contextlib import contextmanager
 
 import psycopg2
@@ -90,8 +91,66 @@ def get_last_locations(taxi_id: int, limit: int = Query(5, le=1000)):
         if not rows:
             raise HTTPException(status_code=404, detail="Keine Standorte fuer dieses Taxi gefunden")
         return rows
+    
+@app.get("/taxis/{taxi_id}/times")
+def get_last_location_timed(
+    taxi_id: int,
+    time_interval: int = Query(5, ge=1, le=1000),
+    number: int = Query(20, ge=1, le=1000),
+):
+    """Return up to `number` evenly distributed samples from the last `time_interval` minutes."""
 
+    sql = """
+        SELECT taxi_id, event_timestamp, longitude, latitude, speed,
+               average_speed, total_distance, is_speeding,
+               is_out_of_area, is_parking
+        FROM taxi_speed
+        WHERE taxi_id = %s
+          AND event_timestamp >= (
+              SELECT MAX(event_timestamp) - (%s || ' minutes')::interval
+              FROM taxi_speed
+              WHERE taxi_id = %s
+          )
+        ORDER BY event_timestamp ASC
+    """
 
+    with get_conn() as conn, conn.cursor(
+        cursor_factory=psycopg2.extras.RealDictCursor
+    ) as cur:
+        cur.execute(sql, (taxi_id, time_interval, taxi_id))
+        rows = cur.fetchall()
+
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail="Keine Standorte fuer dieses Taxi gefunden",
+        )
+
+    if len(rows) <= number:
+        return rows
+
+    if number == 1:
+        return [rows[-1]]
+
+    last_index = len(rows) - 1
+
+    # Evenly spaced indices including first and last
+    indices = []
+    for i in range(number):
+        idx = round(i * last_index / (number - 1))
+        if not indices or idx != indices[-1]:
+            indices.append(idx)
+
+    # Fill gaps if rounding produced duplicates
+    current = 0
+    while len(indices) < number:
+        while current in indices:
+            current += 1
+        indices.append(current)
+
+    indices.sort()
+
+    return [rows[i] for i in indices]
 
 @app.get("/health")
 def health():
