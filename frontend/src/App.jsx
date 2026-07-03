@@ -5,13 +5,11 @@ import './App.css';
 import 'leaflet/dist/leaflet.css';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 
-const wsLink = 'ws://localhost:5001';
-// const wsLink = 'ws://34.28.224.202:5001';
 // Todo: Refactor panels in seperate components
 // Todo maybe make a deployment branch which can be rebased from main, wich changes this const
 //change for deployment
-// const API_BASE = 'http://34.28.224.202:5001';
-const API_BASE = 'http://localhost:5001';
+// const BACKEND = 'http://34.28.224.202:5001';
+const BACKEND = 'http://localhost:5001';
 
 // consts for path display
 const PATH_LOCATIONS_LIMIT = 30;
@@ -425,7 +423,7 @@ function App() {
     let cancelled = false;
     setPathError(null);
 
-    fetch(`${API_BASE}/taxis/${selectedTaxiId}/locations?time_interval=${TIME_INTERVAL}&number=${PATH_LOCATIONS_LIMIT}`)
+    fetch(`${BACKEND}/taxis/${selectedTaxiId}/locations?time_interval=${TIME_INTERVAL}&number=${PATH_LOCATIONS_LIMIT}`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -445,7 +443,7 @@ function App() {
   }, [selectedTaxiId]);
 
   useEffect(() => {
-    const socket = new WebSocket(wsLink);
+    const socket = new WebSocket(BACKEND);
 
     socket.onopen = () => setStatus('Connected – Live-Stream active');
 
