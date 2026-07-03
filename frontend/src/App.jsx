@@ -697,16 +697,7 @@ function App() {
                 />
               )}
 
-              {selectedTaxiId !== null && normalizedPathLocations.map((p, idx) => (
-                <CircleMarker
-                  key={`path-${selectedTaxiId}-${idx}`}
-                  center={[p.latitude, p.longitude]}
-                  radius={4}
-                  pathOptions={{ color: '#1D4ED8', fillColor: '#1D4ED8', fillOpacity: 0.6 }}
-                >
-                  <Popup>{p.timestamp}</Popup>
-                </CircleMarker>
-              ))}
+
 
 
               {taxis.map((taxi) => {
