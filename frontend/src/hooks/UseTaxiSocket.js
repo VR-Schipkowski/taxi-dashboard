@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { TAXI_UPDATE_FLUSH_INTERVAL_MS, BACKEND } from "../config";
+import { TAXI_UPDATE_FLUSH_INTERVAL_MS, WS_LINK } from "../config";
 
 /**
  * Owns the WebSocket connection and all state driven by it: taxi positions,
@@ -19,7 +19,7 @@ import { TAXI_UPDATE_FLUSH_INTERVAL_MS, BACKEND } from "../config";
  * @param {(incidents: object[]) => void} [callbacks.onSpeedingAlert]
  * @param {(violations: object[]) => void} [callbacks.onAreaViolation]
  */
-export function useTaxiSocket(wsUrl = BACKEND, callbacks = {}) {
+export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
   // Keep latest callbacks without re-opening the socket when they change
   // identity on every render.
   const callbacksRef = useRef(callbacks);
