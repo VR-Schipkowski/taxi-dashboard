@@ -6,14 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 
 // Todo: Refactor panels in seperate components
-// Todo maybe make a deployment branch which can be rebased from main, wich changes this const
-//change for deployment
-// const BACKEND = 'http://34.28.224.202:5001';
-const BACKEND = 'http://localhost:5001';
-
-// consts for path display
-const PATH_LOCATIONS_LIMIT = 30;
-const TIME_INTERVAL = 15; // in minutes
+import { BACKEND, PATH_LOCATIONS_LIMIT, PATH_TIME_INTERVAL, STALE_AFTER_MS, DEBUG_LOG_MAX_ENTRIES, NOW_UPDATE_INTERVAL_MS, TAXI_UPDATE_FLUSH_INTERVAL_MS } from './config.js';
 
 // create icons per taxi
 function createDotIcon({ color, size = 14, variant = 'default', ring = false, ringColor }) {
@@ -38,8 +31,6 @@ const TAG_STYLES = {
   taxiUpdate: { bg: '#E6F1FB', color: '#185FA5', dot: '#378ADD' },
 };
 
-// const for fading
-const STALE_AFTER_MS = 30 * 1000;
 
 function getOpacity(lastSeenTime, now) {
   if (!lastSeenTime) return 1;
@@ -293,7 +284,7 @@ function App() {
   const [pathError, setPathError] = useState(null);
 
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 5000);
+    const interval = setInterval(() => setNow(Date.now()), NOW_UPDATE_INTERVAL_MS);
     return () => clearInterval(interval);
   }, []);
 
@@ -313,7 +304,7 @@ function App() {
         });
         return next;
       });
-    }, 3000);
+    }, TAXI_UPDATE_FLUSH_INTERVAL_MS);
     return () => clearInterval(flush);
   }, []);
 
@@ -385,7 +376,7 @@ function App() {
   function addDebugEntry(type, text, taxiId = null) {
     const now = new Date();
     const ts = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
-    setDebugEntries(prev => [{ type, text, ts, taxiId }, ...prev].slice(0, 300));
+    setDebugEntries(prev => [{ type, text, ts, taxiId }, ...prev].slice(0, DEBUG_LOG_MAX_ENTRIES));
     setDebugCounts(prev => ({ ...prev, [type]: prev[type] + 1 }));
   }
 
@@ -423,7 +414,7 @@ function App() {
     let cancelled = false;
     setPathError(null);
 
-    fetch(`${BACKEND}/taxis/${selectedTaxiId}/locations?time_interval=${TIME_INTERVAL}&number=${PATH_LOCATIONS_LIMIT}`)
+    fetch(`${BACKEND}/taxis/${selectedTaxiId}/locations?time_interval=${PATH_TIME_INTERVAL}&number=${PATH_LOCATIONS_LIMIT}`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
