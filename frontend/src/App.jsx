@@ -466,6 +466,20 @@ function App() {
       String(prev) === String(taxiId) ? null : taxiId,
     );
   }
+  function normalizeAlarmTaxi(a) {
+    return {
+      taxi_id: String(a.taxiId),
+      latitude: a.latitude,
+      longitude: a.longitude,
+      speed: a.speed,
+      averageSpeed: a.averageSpeed,
+      distance: a.totalDistance,
+      timestamp: a.timestamp,
+      isSpeeding: a.isSpeeding,
+      isParking: a.isParking,
+      _opacity: 1,
+    };
+  }
 
   // Used both by the search box and by clicking a marker/alert.
   function selectTaxi(taxiId) {
