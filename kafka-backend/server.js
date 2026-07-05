@@ -97,7 +97,6 @@ function broadcast(payload) {
 async function buildSnapshot() {
     const keys = await redis.keys('taxi:speed:*');
     const taxis = [];
-    // TODO: check why is this done?
     let totalDistanceAll = 0;
     for (const key of keys) {
         const data = await redis.hgetall(key);
@@ -107,7 +106,6 @@ async function buildSnapshot() {
                 latitude: parseFloat(data.latitude),
                 longitude: parseFloat(data.longitude),
                 speed: parseFloat(data.speed),
-                // TODO: have two times the same distance, need to change that
                 distance: parseFloat(data.distance),
                 timestamp: data.timestamp,
                 isSpeeding: data.isSpeeding === 'true',

@@ -688,27 +688,6 @@ function App() {
               disableClusteringAtZoom={16}
               showCoverageOnHover={false}
             >
-
-              {selectedTaxiId !== null && pathPositions.length > 1 && (
-                <Polyline
-                  key={`poly-${selectedTaxiId}`}
-                  positions={pathPositions}
-                  pathOptions={{ color: '#1D4ED8', weight: 3, opacity: 0.7 }}
-                />
-              )}
-
-              {selectedTaxiId !== null && normalizedPathLocations.map((p, idx) => (
-                <CircleMarker
-                  key={`path-${selectedTaxiId}-${idx}`}
-                  center={[p.latitude, p.longitude]}
-                  radius={4}
-                  pathOptions={{ color: '#1D4ED8', fillColor: '#1D4ED8', fillOpacity: 0.6 }}
-                >
-                  <Popup>{p.timestamp}</Popup>
-                </CircleMarker>
-              ))}
-
-
               {taxis.map((taxi) => {
                 const isSpeeding = taxi.isSpeeding;
                 const isOutOfArea = violatingTaxiIds.has(String(taxi.taxi_id));
@@ -750,6 +729,23 @@ function App() {
                 );
               })}
             </MarkerClusterGroup>
+            {selectedTaxiId !== null && pathPositions.length > 1 && (
+                <Polyline
+                  key={`poly-${selectedTaxiId}`}
+                  positions={pathPositions}
+                  pathOptions={{ color: '#1D4ED8', weight: 3, opacity: 0.7 }}
+                />
+              )}
+              {selectedTaxiId !== null && normalizedPathLocations.map((p, idx) => (
+                <CircleMarker
+                  key={`path-${selectedTaxiId}-${idx}`}
+                  center={[p.latitude, p.longitude]}
+                  radius={4}
+                  pathOptions={{ color: '#1D4ED8', fillColor: '#1D4ED8', fillOpacity: 0.6 }}
+                >
+                  <Popup>{p.timestamp}</Popup>
+                </CircleMarker>
+              ))}
           </MapContainer>
         </div>
 
