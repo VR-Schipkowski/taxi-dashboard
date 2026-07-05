@@ -17,6 +17,7 @@ const kafka = new Kafka({ brokers: ['kafka:9092'] });
 
 let speedingIncidents = [];
 let areaViolations = [];
+let previousSpeedingIncidents = [];
  // taxiId -> violation
 
 // Rolling window of recent end-to-end latencies (ms) for the dashboard health panel.
@@ -127,8 +128,8 @@ wss.on('connection', async (ws) => {
         type: 'snapshot',
         taxis,
         stats: { activeTaxiCount: taxis.length, totalDistanceAll, ...latencyStats() },
-        speedingIncidents,
-        areaViolations
+        areaViolations,
+        speedingIncidents: previousSpeedingIncidents
     }));
 });
 
@@ -167,8 +168,27 @@ async function startConsumers() {
     await speedingConsumer.subscribe({ topic: 'taxi-speeding', fromBeginning: false });
     await speedingConsumer.run({
         eachMessage: async ({ message }) => {
-            speedingIncidents = JSON.parse(message.value.toString());
-            broadcast({ type: 'speedingAlert', speedingIncidents });
+            const curSpeedingIncidents = JSON.parse(message.value.toString());
+            const startedSpeeding = curSpeedingIncidents.filter(i =>
+                !previousSpeedingIncidents.some(p => p.taxiId === i.taxiId)
+            );
+            const stoppedSpeeding = previousSpeedingIncidents.filter(i =>
+                !curSpeedingIncidents.some(p => p.taxiId === i.taxiId)
+            );
+            startedSpeeding.forEach(i => broadcast({
+                type: 'speedingStarted',
+                taxiId: i.taxiId,
+                latitude: i.latitude,
+                longitude: i.longitude,
+                speed: i.speed,
+                timestamp: i.timestamp,
+            }));
+            stoppedSpeeding.forEach(i => broadcast({
+                type: 'speedingEnded',
+                taxiId: i.taxiId,
+            }));
+            
+            broadcast({ type: 'speedingAlert', curSpeedingIncidents });
         }
     });
 

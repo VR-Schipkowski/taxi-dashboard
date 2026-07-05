@@ -281,6 +281,7 @@ function App() {
   const [latencyHistory, setLatencyHistory] = useState([]);
   const [latencyTrend, setLatencyTrend] = useState(null);
   const selectedTaxiIdRef = useRef(null);
+  const seenTaxiIdRef = useRef(new Set());
 
   useEffect(() => {
     selectedTaxiIdRef.current = selectedTaxiId; // snychronizes ref to current state
@@ -464,6 +465,7 @@ function App() {
           });
           setTaxiMap(map);
           setLastSeen(seen);
+          seenTaxiIdRef.current = new Set(data.taxis.map( t => String(t.taxi_id)));
           setSpeedingIncidents(data.speedingIncidents || []);
           setAreaViolations(data.areaViolations || []);
           addDebugEntry('taxiUpdate', `snapshot — ${data.taxis.length} taxis loaded`);
@@ -479,11 +481,15 @@ function App() {
           const t = data.taxi;
           setTaxiMap(prev => ({ ...prev, [t.taxi_id]: t }));
           setLastSeen(prev => ({ ...prev, [t.taxi_id]: Date.now() }));
-          addDebugEntry(
-            'taxiUpdate',
-            `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? ' ⚡' : ''}${t.isParking ? ' 🅿' : ''}`,
-            t.taxi_id
-          );
+          const newTaxi = !seenTaxiIdRef.current.has(String(t.taxi_id));
+          if (newTaxi) {
+              addDebugEntry(
+              'taxiUpdate',
+              `NEW taxi ${t.taxi_id} appeared`,
+              t.taxi_id
+              );
+              seenTaxiIdRef.current.add(String(t.taxi_id));
+          }
           if (String(selectedTaxiIdRef.current) === String(data.taxi.taxi_id)) {
             setPathLocations(prev => {
 
@@ -520,18 +526,31 @@ function App() {
             return newHistory;
           });
 
-
-
-        } else if (data.type === 'speedingAlert') {
-          const i = data.speedingIncidents;
-          setSpeedingIncidents(data.speedingIncidents || []);
-          i.forEach(i => {
-            addDebugEntry(
-              'speeding',
-              `taxi ${i.taxiId} — ${i.speed.toFixed(1)} km/h`,
-              i.taxiId
+        } else if (data.type === 'speedingStarted') {
+          setSpeedingIncidents(prev => [...prev.filter(i => i.taxi_id !== data.taxi_id),
+              {
+                taxiId: data.taxiId,
+                latitude: data.latitude,
+                longitude: data.longitude,
+                timestamp: data.timestamp,
+                speed: data.speed,
+              }
+            ]);
+          
+          addDebugEntry(
+            'speeding',
+            `taxi ${data.taxiId} started speeding: ${data.speed.toFixed(1)} km/h`,
+            data.taxiId
             );
-          });
+
+
+        } else if (data.type === 'speedingEnded') {
+          setSpeedingIncidents(prev => prev.filter(i => i.taxi_id !== data.taxi_id));
+          addDebugEntry(
+            'speeding',
+            `taxi ${data.taxiId} stopped speeding`,
+            data.taxiId
+            );
 
         } else if (data.type === 'areaViolation') {
           const v = data.areaViolations;
