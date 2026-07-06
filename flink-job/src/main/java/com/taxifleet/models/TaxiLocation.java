@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class TaxiLocation {
 
-    @JsonProperty("taxi_id")
+    @JsonProperty("taxiid")
     public int taxiId;
 
     public String timestamp;
