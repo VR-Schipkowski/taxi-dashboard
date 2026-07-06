@@ -116,10 +116,15 @@ public class SpeedCalculatorProcessFunction
 
                         previousLocation.update(current);
                         count.update(c + 1);
-
-                        TaxiSpeed warm = new TaxiSpeed(current);
-                        warm.ingestedAt = current.ingestedAt;
-                        out.collect(warm);
+                        /*
+                         * lots of taxis sends once and then stop for a long time, for meningfull
+                         * information,
+                         * lets assume if a taxi is only activ if its at leas sended WARMUP times
+                         * TaxiSpeed warm = new TaxiSpeed(current);
+                         * warm.ingestedAt = current.ingestedAt;
+                         * out.collect(warm);
+                         * 
+                         */
                         return;
                 }
 
