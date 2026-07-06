@@ -16,7 +16,7 @@ public class SpeedCalculatorProcessFunction
 
         private static final Logger LOG = LoggerFactory.getLogger(SpeedCalculatorProcessFunction.class);
 
-        private static final double SPEEDLIMIT = 50.0;
+        private static final double SPEEDLIMIT = 60.0;
         private static final int WARMUP = 3;
         private static final double MAXSPEED = 150.0; // realistic taxi limit buffer
         private static final double PARKING = 180; // 3 minutes
@@ -82,14 +82,17 @@ public class SpeedCalculatorProcessFunction
                         count.update(0);
                         previousLocation.update(current);
 
-                        out.collect(new TaxiSpeed(
+                        TaxiSpeed first = new TaxiSpeed(
                                         current.taxiId,
                                         current.timestamp,
                                         current.longitude,
                                         current.latitude,
                                         0.0,
                                         0.0,
-                                        0.0));
+                                        0.0,
+                                        0.0);
+                        first.ingestedAt = current.ingestedAt;
+                        out.collect(first);
 
                         return;
                 }
@@ -105,14 +108,17 @@ public class SpeedCalculatorProcessFunction
                         previousLocation.update(current);
                         count.update(1); // reset warmup after long gap
 
-                        out.collect(new TaxiSpeed(
+                        TaxiSpeed reset = new TaxiSpeed(
                                         current.taxiId,
                                         current.timestamp,
                                         current.longitude,
                                         current.latitude,
                                         0.0,
                                         0.0,
-                                        0.0));
+                                        0.0,
+                                        0.0);
+                        reset.ingestedAt = current.ingestedAt;
+                        out.collect(reset);
                         return;
                 }
                 double speed = speedCalc(previous, current, timeDiffSeconds);
@@ -123,13 +129,16 @@ public class SpeedCalculatorProcessFunction
                                 count.update(c + 1);
 
                         }
-                        out.collect(new TaxiSpeed(
+                        TaxiSpeed warm = new TaxiSpeed(
                                         current.taxiId,
                                         current.timestamp,
                                         current.longitude,
                                         current.latitude,
                                         0.0,
-                                        0.0, 0.0));
+                                        0.0,
+                                        0.0, 0.0);
+                        warm.ingestedAt = current.ingestedAt;
+                        out.collect(warm);
                         return;
                 }
 
@@ -143,14 +152,35 @@ public class SpeedCalculatorProcessFunction
                         return;
                 }
 
+                // Update distance
+                double prevDist = totalDistanceKm.value() == null ? 0.0 : totalDistanceKm.value();
+                double legDist = Helper.calculateDistance(
+                                previous.latitude, previous.longitude,
+                                current.latitude, current.longitude);
+                totalDistanceKm.update(prevDist + legDist);
+
+                // Update rolling average speed
+                Integer samples = speedSampleCount.value();
+                if (samples == null)
+                        samples = 0;
+                double prevAvg = avarageTaxiSpeedKmh.value() == null ? 0.0 : avarageTaxiSpeedKmh.value();
+                double newAvg = (prevAvg * samples + speed)
+                                / (samples + 1);
+                avarageTaxiSpeedKmh.update(newAvg);
+                speedSampleCount.update(samples + 1);
+
+                // create final result taxi object
                 TaxiSpeed result = new TaxiSpeed(
                                 current.taxiId,
                                 current.timestamp,
                                 current.longitude,
                                 current.latitude,
                                 speed,
+                                legDist,
                                 totalDistanceKm.value() == null ? 0.0 : totalDistanceKm.value(),
                                 avarageTaxiSpeedKmh.value() == null ? 0.0 : avarageTaxiSpeedKmh.value());
+
+                result.ingestedAt = current.ingestedAt;
 
                 if (speed > SPEEDLIMIT) {
                         ctx.output(SpeedCalculatorProcess.SPEEDING_TAG, result);
@@ -171,23 +201,6 @@ public class SpeedCalculatorProcessFunction
                 }
 
                 out.collect(result);
-
-                // Update distance
-                double prevDist = totalDistanceKm.value() == null ? 0.0 : totalDistanceKm.value();
-                double legDist = Helper.calculateDistance(
-                                previous.latitude, previous.longitude,
-                                current.latitude, current.longitude);
-                totalDistanceKm.update(prevDist + legDist);
-
-                // Update rolling average speed
-                Integer samples = speedSampleCount.value();
-                if (samples == null)
-                        samples = 0;
-                double prevAvg = avarageTaxiSpeedKmh.value() == null ? 0.0 : avarageTaxiSpeedKmh.value();
-                double newAvg = (prevAvg * samples + speed)
-                                / (samples + 1);
-                avarageTaxiSpeedKmh.update(newAvg);
-                speedSampleCount.update(samples + 1);
 
                 // IMPORTANT: only update state after validation
                 previousLocation.update(current);

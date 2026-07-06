@@ -168,6 +168,8 @@ def replay(
                     "timestamp": dt.strftime(TIMESTAMP_FMT),
                     "longitude": lon,
                     "latitude":  lat,
+                    # Wall-clock epoch-millis at publish time, for end-to-end latency.
+                    "ingested_at": int(time.time() * 1000),
                 })
                 last_seen[taxi_id] = dt
                 total_sent += 1
