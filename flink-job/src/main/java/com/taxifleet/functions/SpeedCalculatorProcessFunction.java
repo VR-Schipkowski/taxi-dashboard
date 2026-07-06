@@ -113,11 +113,10 @@ public class SpeedCalculatorProcessFunction
                 double speed = speedCalc(previous, current, timeDiffSeconds);
 
                 if (c < WARMUP) {
-                        if (speed <= MAXSPEED) {
-                                previousLocation.update(current);
-                                count.update(c + 1);
 
-                        }
+                        previousLocation.update(current);
+                        count.update(c + 1);
+
                         TaxiSpeed warm = new TaxiSpeed(current);
                         warm.ingestedAt = current.ingestedAt;
                         out.collect(warm);
