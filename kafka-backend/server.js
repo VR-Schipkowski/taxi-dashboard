@@ -17,7 +17,7 @@ const kafka = new Kafka({ brokers: ['kafka:9092'] });
 
 let speedingIncidents = [];
 let areaViolations = [];
- // taxiId -> violation
+ // taxi_Id -> violation
 
 // Rolling window of recent end-to-end latencies (ms) for the dashboard health panel.
 // Each taxi-processed event carries ingestedAt (provider publish time); latency is
@@ -145,7 +145,7 @@ async function startConsumers() {
             broadcast({
                 type: 'taxiUpdate',
                 taxi: {
-                    taxi_id: String(event.taxiId),
+                    taxi_id: String(event.taxi_id),
                     latitude: event.latitude,
                     longitude: event.longitude,
                     speed: event.speed,

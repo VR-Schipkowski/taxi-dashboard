@@ -55,12 +55,12 @@ public class TaxiJob {
                 // Todo : reasoning for windowing, maybe instead of sending last we could use
                 // the windows to denoise the position also we have a throtteling later on
                 DataStream<TaxiLocation> filteredLocationStream = locationStream
-                                .keyBy(location -> location.taxiId)
+                                .keyBy(location -> location.taxi_id)
                                 .window(TumblingProcessingTimeWindows.of(Duration.ofSeconds(5)))
                                 .maxBy("timestamp");
 
                 SingleOutputStreamOperator<TaxiSpeed> speedStream = filteredLocationStream
-                                .keyBy(location -> location.taxiId)
+                                .keyBy(location -> location.taxi_id)
                                 .process(new SpeedCalculatorProcessFunction());
 
                 ObjectMapper mapper = new ObjectMapper();
@@ -84,7 +84,7 @@ public class TaxiJob {
                 // connection lifecycle per task.
                 // Notify area violation — immediate, side output from OutOfAreaProcessFunction
                 SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
-                                .keyBy(speed -> speed.taxiId)
+                                .keyBy(speed -> speed.taxi_id)
                                 .process(new OutOfAreaProcessFunction());
                 DataStream<TaxiSpeed> outOfAreaStream = outOfAreaCheckedStream
                                 .getSideOutput(OutOfAreaProcess.OUT_OF_AREA_TAG);
@@ -112,7 +112,7 @@ public class TaxiJob {
                 // seconds (not sending OOA taxis)
                 // Todo: why throttle again already done in the front
                 DataStream<TaxiSpeed> throttledStream = outOfAreaCheckedStream
-                                .keyBy(speed -> speed.taxiId)
+                                .keyBy(speed -> speed.taxi_id)
                                 .window(TumblingProcessingTimeWindows.of(Duration.ofSeconds(5)))
                                 .maxBy("timestamp");
 

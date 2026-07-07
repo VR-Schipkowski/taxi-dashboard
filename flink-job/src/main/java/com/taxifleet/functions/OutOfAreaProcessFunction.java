@@ -27,7 +27,7 @@ public class OutOfAreaProcessFunction
 
         if (outOfArea) {
             LOG.warn("Taxi {} is out of area at ({}, {})",
-                    current.taxiId, current.latitude, current.longitude);
+                    current.taxi_id, current.latitude, current.longitude);
 
             // Side output → taxi-area-violations alert topic
             ctx.output(OutOfAreaProcess.OUT_OF_AREA_TAG, current);

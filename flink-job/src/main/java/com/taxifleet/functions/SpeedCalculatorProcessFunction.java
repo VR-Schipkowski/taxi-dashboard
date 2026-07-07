@@ -21,6 +21,7 @@ public class SpeedCalculatorProcessFunction
         private static final double MAXSPEED = 150.0; // realistic taxi limit buffer
         private static final double PARKING = 180; // 3 minutes
         private static final double SECONDS_BEFOR_RESET = 600; // 10 minutes
+        private static final double ALPHA = 0.5;
 
         private transient ValueState<Double> avarageTaxiSpeedKmh;
         private transient ValueState<Integer> count;
@@ -28,7 +29,10 @@ public class SpeedCalculatorProcessFunction
         private transient ValueState<Integer> speedSampleCount;
         private transient ValueState<TaxiLocation> previousLocation;
         private transient ValueState<Long> lastMovedEventTimeMillis;
+        private transient ValueState<Double> lastSpeed;
 
+        // ToDo :right now we filter out a lot of data during warmup phase, this is good
+        // for the frontend, we should think how to get these also to the db
         @Override
         public void open(Configuration parameters) {
                 ValueStateDescriptor<TaxiLocation> descriptor = new ValueStateDescriptor<>("previous-location",
@@ -44,6 +48,8 @@ public class SpeedCalculatorProcessFunction
                                 .getState(new ValueStateDescriptor<>("speed-sample-count", Integer.class));
                 lastMovedEventTimeMillis = getRuntimeContext()
                                 .getState(new ValueStateDescriptor<>("last-moved", Long.class));
+                lastSpeed = getRuntimeContext()
+                                .getState(new ValueStateDescriptor<>("last-speed", Double.class));
         }
 
         public static double speedCalc(
@@ -85,23 +91,25 @@ public class SpeedCalculatorProcessFunction
                 if (previous == null) {
                         count.update(0);
                         previousLocation.update(current);
-
-                        TaxiSpeed first = new TaxiSpeed(current);
-
-                        first.ingestedAt = current.ingestedAt;
-                        out.collect(first);
-
+                        /*
+                         * only out put stable data, so we need to wait for WARMUP times before we can
+                         * TaxiSpeed first = new TaxiSpeed(current);
+                         * 
+                         * first.ingestedAt = current.ingestedAt;
+                         * out.collect(first);
+                         * output a result
+                         */
                         return;
                 }
 
                 double timeDiffSeconds = (current.eventTimeMillis - previous.eventTimeMillis) / 1000.0;
                 if (timeDiffSeconds <= 0) {
-                        LOG.warn("DROP_INVALID_TIME taxiId={} prevTs={} currTs={}",
-                                        current.taxiId, previous.timestamp, current.timestamp);
+                        LOG.warn("DROP_INVALID_TIME taxi_id={} prevTs={} currTs={}",
+                                        current.taxi_id, previous.timestamp, current.timestamp);
                         return;
                 }
                 if (timeDiffSeconds > SECONDS_BEFOR_RESET) {
-                        LOG.warn("DROP_OLD_DATA taxiId={} timeDiffSec={}", current.taxiId, timeDiffSeconds);
+                        LOG.warn("DROP_OLD_DATA taxi_id={} timeDiffSec={}", current.taxi_id, timeDiffSeconds);
                         previousLocation.update(current);
                         count.update(1); // reset warmup after long gap
 
@@ -110,7 +118,6 @@ public class SpeedCalculatorProcessFunction
                         out.collect(reset);
                         return;
                 }
-                double speed = speedCalc(previous, current, timeDiffSeconds);
 
                 if (c < WARMUP) {
 
@@ -128,10 +135,11 @@ public class SpeedCalculatorProcessFunction
                         return;
                 }
 
+                double speed = speedCalc(previous, current, timeDiffSeconds);
                 if (speed > MAXSPEED) {
 
-                        LOG.warn("SPIKE_REJECTED taxiId={} speed={} km/h distKm={} timeSec={}",
-                                        current.taxiId, speed, timeDiffSeconds);
+                        LOG.warn("SPIKE_REJECTED taxi_id={} speed={} km/h distKm={} timeSec={}",
+                                        current.taxi_id, speed, timeDiffSeconds);
 
                         // IMPORTANT:
                         // do NOT update state → prevents poisoning future calculations

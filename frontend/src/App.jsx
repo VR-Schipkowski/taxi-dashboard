@@ -144,7 +144,7 @@ function DebugAlerts({
   // Only show selected taxi allerts
   const visible = entries.filter(e => {
     if (!filters[e.type]) return false;
-    if (selectedTaxiId !== null && String(e.taxiId) !== String(selectedTaxiId)) return false;
+    if (selectedTaxiId !== null && String(e.taxi_id) !== String(selectedTaxiId)) return false;
     return true;
   });
 
@@ -163,15 +163,15 @@ function DebugAlerts({
         <div style={{ padding: '8px 12px', borderBottom: '1px solid #e5e7eb', background: '#FAFAFA' }}>
           <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6 }}>Current Violators</div>
           {activeFilters.speeding && speedingIncidents.map(i => (
-            <div key={`s-${i.taxiId}`} onClick={() => onSelectTaxi(i.taxiId)}
+            <div key={`s-${i.taxi_id}`} onClick={() => onSelectTaxi(i.taxi_id)}
               style={{ cursor: 'pointer', fontSize: 11, padding: '2px 0' }}>
-              🚖 {i.taxiId} — {i.speed?.toFixed(1)} km/h
+              🚖 {i.taxi_id} — {i.speed?.toFixed(1)} km/h
             </div>
           ))}
           {activeFilters.area && areaViolations.map(v => (
-            <div key={`a-${v.taxiId}`} onClick={() => onSelectTaxi(v.taxiId)}
+            <div key={`a-${v.taxi_id}`} onClick={() => onSelectTaxi(v.taxi_id)}
               style={{ cursor: 'pointer', fontSize: 11, padding: '2px 0' }}>
-              🚖 {v.taxiId} — outside permitted area
+              🚖 {v.taxi_id} — outside permitted area
             </div>
           ))}
         </div>
@@ -231,12 +231,12 @@ function DebugAlerts({
         ) : (
           visible.map((entry, i) => {
             const s = TAG_STYLES[entry.type];
-            const clickable = entry.taxiId !== null && entry.taxiId !== undefined;
-            const selected = clickable && String(entry.taxiId) === String(selectedTaxiId);
+            const clickable = entry.taxi_id !== null && entry.taxi_id !== undefined;
+            const selected = clickable && String(entry.taxi_id) === String(selectedTaxiId);
             return (
               <div
                 key={i}
-                onClick={() => clickable && onSelectTaxi(entry.taxiId)}
+                onClick={() => clickable && onSelectTaxi(entry.taxi_id)}
                 style={{
                   display: 'flex', gap: 8, padding: '5px 12px',
                   borderBottom: '1px solid #f3f4f6', alignItems: 'flex-start',
@@ -366,7 +366,7 @@ function App() {
 
   function normalizeAlarmTaxi(a) {
     return {
-      taxi_id: String(a.taxiId),
+      taxi_id: String(a.taxi_id),
       latitude: a.latitude,
       longitude: a.longitude,
       speed: a.speed,
@@ -384,10 +384,10 @@ function App() {
   const [debugCounts, setDebugCounts] = useState({ speeding: 0, area: 0, taxiUpdate: 0 });
   const [debugFilters, setDebugFilters] = useState({ speeding: true, area: true, taxiUpdate: true });
 
-  function addDebugEntry(type, text, taxiId = null) {
+  function addDebugEntry(type, text, taxi_id = null) {
     const now = new Date();
     const ts = now.toTimeString().slice(0, 8) + '.' + String(now.getMilliseconds()).padStart(3, '0');
-    setDebugEntries(prev => [{ type, text, ts, taxiId }, ...prev].slice(0, 300));
+    setDebugEntries(prev => [{ type, text, ts, taxi_id }, ...prev].slice(0, 300));
     setDebugCounts(prev => ({ ...prev, [type]: prev[type] + 1 }));
   }
 
@@ -400,13 +400,13 @@ function App() {
     setDebugCounts({ speeding: 0, area: 0, taxiUpdate: 0 });
   }
 
-  function selectTaxiFromAlert(taxiId) {
-    setSelectedTaxiId(prev => (String(prev) === String(taxiId) ? null : taxiId));
+  function selectTaxiFromAlert(taxi_id) {
+    setSelectedTaxiId(prev => (String(prev) === String(taxi_id) ? null : taxi_id));
   }
 
   // Wird sowohl vom Suchfeld als auch vom Klick auf einen Marker/Alert genutzt.
-  function selectTaxi(taxiId) {
-    setSelectedTaxiId(taxiId);
+  function selectTaxi(taxi_id) {
+    setSelectedTaxiId(taxi_id);
   }
 
   function clearSelection() {
@@ -528,8 +528,8 @@ function App() {
           i.forEach(i => {
             addDebugEntry(
               'speeding',
-              `taxi ${i.taxiId} — ${i.speed.toFixed(1)} km/h`,
-              i.taxiId
+              `taxi ${i.taxi_id} — ${i.speed.toFixed(1)} km/h`,
+              i.taxi_id
             );
           });
 
@@ -537,7 +537,7 @@ function App() {
           const v = data.areaViolations;
           setAreaViolations(data.areaViolations || []);
           v.forEach(violation => {
-            addDebugEntry('area', `taxi ${violation.taxiId} outside permitted area`, violation.taxiId);
+            addDebugEntry('area', `taxi ${violation.taxi_id} outside permitted area`, violation.taxi_id);
           });
         }
 
@@ -553,8 +553,8 @@ function App() {
 
   const allTaxis = Object.values(taxiMap);
 
-  const violatingTaxiIds = new Set(areaViolations.map(v => String(v.taxiId)));
-  const speedingTaxiIds = new Set(speedingIncidents.map(i => String(i.taxiId)));
+  const violatingTaxiIds = new Set(areaViolations.map(v => String(v.taxi_id)));
+  const speedingTaxiIds = new Set(speedingIncidents.map(i => String(i.taxi_id)));
 
   const visibleTaxis = allTaxis
     .map(t => ({ ...t, _opacity: getOpacity(lastSeen[t.taxi_id], now) }))
@@ -565,12 +565,12 @@ function App() {
   const violatorMap = {};
   if (activeFilters.speeding) {
     speedingIncidents.forEach(i => {
-      violatorMap[i.taxiId] = normalizeAlarmTaxi(i);
+      violatorMap[i.taxi_id] = normalizeAlarmTaxi(i);
     });
   }
   if (activeFilters.area) {
     areaViolations.forEach(v => {
-      violatorMap[v.taxiId] = { ...violatorMap[v.taxiId], ...normalizeAlarmTaxi(v) };
+      violatorMap[v.taxi_id] = { ...violatorMap[v.taxi_id], ...normalizeAlarmTaxi(v) };
     });
   }
 

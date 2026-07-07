@@ -30,24 +30,25 @@ public class RedisSink implements Serializable {
         }
         return jedisPool;
     }
-    // TODO here we have two values for distance? 
+
+    // TODO here we have two values for distance?
     public void store(TaxiSpeed speed) {
         try (Jedis jedis = getPool().getResource()) {
-            String key = "taxi:speed:" + speed.taxiId;
-            jedis.hset(key, "latitude",     String.valueOf(speed.latitude));
-            jedis.hset(key, "longitude",    String.valueOf(speed.longitude));
-            jedis.hset(key, "speed",        String.valueOf(speed.speed));
-            jedis.hset(key, "distance",     String.valueOf(speed.curDistance));
-            jedis.hset(key, "timestamp",    String.valueOf(speed.timestamp));
-            jedis.hset(key, "isSpeeding",   String.valueOf(speed.isSpeeding));
-            jedis.hset(key, "isOutOfArea",  String.valueOf(speed.isOutOfArea));
+            String key = "taxi:speed:" + speed.taxi_id;
+            jedis.hset(key, "latitude", String.valueOf(speed.latitude));
+            jedis.hset(key, "longitude", String.valueOf(speed.longitude));
+            jedis.hset(key, "speed", String.valueOf(speed.speed));
+            jedis.hset(key, "distance", String.valueOf(speed.curDistance));
+            jedis.hset(key, "timestamp", String.valueOf(speed.timestamp));
+            jedis.hset(key, "isSpeeding", String.valueOf(speed.isSpeeding));
+            jedis.hset(key, "isOutOfArea", String.valueOf(speed.isOutOfArea));
             jedis.hset(key, "averageSpeed", String.valueOf(speed.averageSpeed));
-            jedis.hset(key, "totalDistance",String.valueOf(speed.totalDistance));
-            jedis.hset(key, "isParking",    String.valueOf(speed.isParking));
-            jedis.hset(key, "lastMoved",    speed.lastMoved != null ? speed.lastMoved : "");
+            jedis.hset(key, "totalDistance", String.valueOf(speed.totalDistance));
+            jedis.hset(key, "isParking", String.valueOf(speed.isParking));
+            jedis.hset(key, "lastMoved", speed.lastMoved != null ? speed.lastMoved : "");
             jedis.expire(key, 60);
         } catch (Exception e) {
-            System.err.println("Redis write failed for taxi " + speed.taxiId + ": " + e.getMessage());
+            System.err.println("Redis write failed for taxi " + speed.taxi_id + ": " + e.getMessage());
         }
     }
 }

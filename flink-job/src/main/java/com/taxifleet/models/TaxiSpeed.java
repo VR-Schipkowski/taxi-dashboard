@@ -16,7 +16,7 @@ public class TaxiSpeed extends TaxiLocation {
     }
 
     public TaxiSpeed(TaxiLocation loc) {
-        this.taxiId = loc.taxiId;
+        this.taxi_id = loc.taxi_id;
         this.timestamp = loc.timestamp;
         this.eventTimeMillis = loc.eventTimeMillis;
         this.longitude = loc.longitude;
@@ -27,7 +27,7 @@ public class TaxiSpeed extends TaxiLocation {
     @Override
     public String toString() {
         String r = String.format("Taxi %d: %.2f km/h at (%.5f, %.5f)",
-                taxiId, speed, latitude, longitude);
+                taxi_id, speed, latitude, longitude);
         if (isSpeeding)
             r += " !!!Speeding!!!";
         if (isOutOfArea)
