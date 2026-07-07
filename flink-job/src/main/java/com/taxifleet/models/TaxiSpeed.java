@@ -10,6 +10,7 @@ public class TaxiSpeed extends TaxiLocation {
     public boolean isOutOfArea;
     public String lastMoved;
     public boolean isParking;
+    public boolean speedingStateChanged;
 
     public TaxiSpeed() {
         super();

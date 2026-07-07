@@ -169,6 +169,7 @@ async function startConsumers() {
           isSpeeding: event.isSpeeding,
           averageSpeed: event.averageSpeed,
           totalDistance: event.totalDistance,
+          speedingStateChanged: event.speedingStateChanged,
           lastMoved: event.lastMoved ?? "",
           isParking: event.isParking ?? false,
         },

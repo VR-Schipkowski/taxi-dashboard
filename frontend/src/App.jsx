@@ -51,17 +51,35 @@ function App() {
         );
         seenTaxiIdRef.current.add(String(t.taxi_id));
       }
+
+      // Handle speeding state transitions
+      if (t.speedingStateChanged) {
+        if (t.isSpeeding) {
+          debugLog.addEntry(
+            "speeding",
+            `⚡ ${t.taxi_id} STARTED speeding at ${t.speed?.toFixed(1)} km/h`,
+            t.taxi_id
+          );
+        } else {
+          debugLog.addEntry(
+            "speeding",
+            `✅ ${t.taxi_id} STOPPED speeding`,
+            t.taxi_id
+          );
+        }
+      }
+
       appendLiveUpdate(t);
     },
-    onSpeedingAlert: (incidents) => {
-      incidents.forEach((i) => {
-        debugLog.addEntry(
-          "speeding",
-          `taxi ${i.taxi_id} — ${i.speed.toFixed(1)} km/h`,
-          i.taxi_id,
-        );
-      });
-    },
+    // onSpeedingAlert: (incidents) => {
+    //   incidents.forEach((i) => {
+    //     debugLog.addEntry(
+    //       "speeding",
+    //       `taxi ${i.taxi_id} — ${i.speed.toFixed(1)} km/h`,
+    //       i.taxi_id
+    //     );
+    //   });
+    // },
     onAreaViolation: (violations) => {
       violations.forEach((v) => {
         debugLog.addEntry(

@@ -30,6 +30,7 @@ public class SpeedCalculatorProcessFunction
         private transient ValueState<TaxiLocation> previousLocation;
         private transient ValueState<Long> lastMovedEventTimeMillis;
         private transient ValueState<Double> lastSpeed;
+        private ValueState<Boolean> previousSpeedingState;
 
         // ToDo :right now we filter out a lot of data during warmup phase, this is good
         // for the frontend, we should think how to get these also to the db
@@ -50,6 +51,8 @@ public class SpeedCalculatorProcessFunction
                                 .getState(new ValueStateDescriptor<>("last-moved", Long.class));
                 lastSpeed = getRuntimeContext()
                                 .getState(new ValueStateDescriptor<>("last-speed", Double.class));
+                previousSpeedingState = getRuntimeContext()
+                                .getState(new ValueStateDescriptor<>("previousSpeedingState", Boolean.class));
         }
 
         public static double speedCalc(
@@ -110,6 +113,7 @@ public class SpeedCalculatorProcessFunction
                 if (previous == null) {
                         count.update(0);
                         previousLocation.update(current);
+                        //previousSpeedingState.update(false);
                         /*
                          * only out put stable data, so we need to wait for WARMUP times before we can
                          * TaxiSpeed first = new TaxiSpeed(current);
@@ -125,12 +129,14 @@ public class SpeedCalculatorProcessFunction
                 if (timeDiffSeconds <= 0) {
                         LOG.warn("DROP_INVALID_TIME taxi_id={} prevTs={} currTs={}",
                                         current.taxi_id, previous.timestamp, current.timestamp);
+                        // Don't update state for invalid time - state remains unchanged
                         return;
                 }
                 if (timeDiffSeconds > SECONDS_BEFOR_RESET) {
                         LOG.warn("DROP_OLD_DATA taxi_id={} timeDiffSec={}", current.taxi_id, timeDiffSeconds);
                         previousLocation.update(current);
                         count.update(1); // reset warmup after long gap
+                        previousSpeedingState.update(false); // reset speeding state
 
                         TaxiSpeed reset = new TaxiSpeed(current);
                         reset.ingested_at = current.ingested_at;
@@ -142,6 +148,7 @@ public class SpeedCalculatorProcessFunction
 
                         previousLocation.update(current);
                         count.update(c + 1);
+                        //previousSpeedingState.update(false);
                         /*
                          * lots of taxis sends once and then stop for a long time, for meningfull
                          * information,
@@ -191,6 +198,11 @@ public class SpeedCalculatorProcessFunction
                 result.curDistance = legDist;
                 result.isSpeeding = speed > SPEEDLIMIT;
                 result.ingested_at = current.ingested_at;
+
+                Boolean prevSpeeding = previousSpeedingState.value();
+                if (prevSpeeding == null) prevSpeeding = false;
+                result.speedingStateChanged = (prevSpeeding != result.isSpeeding);
+                previousSpeedingState.update(result.isSpeeding);
 
                 if (speed > SPEEDLIMIT) {
                         ctx.output(SpeedCalculatorProcess.SPEEDING_TAG, result);
