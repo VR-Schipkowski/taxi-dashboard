@@ -65,7 +65,7 @@ function App() {
       });
     },
   });
-
+  //ToDo: should be calculated in flink via map reduce
   const totalDistanceAll = useMemo(
     () =>
       Object.values(taxiMap).reduce(

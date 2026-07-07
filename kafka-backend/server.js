@@ -142,6 +142,8 @@ wss.on("connection", async (ws) => {
   );
 });
 
+// Start Kafka consumers for taxi-processed, taxi-speeding, and taxi-area-violations topics
+// ToDo why not use redice for taxi data?? isnt is double work to have both kafka and redis?
 async function startConsumers() {
   // Consumer for taxi-processed — broadcast single taxi update, no Redis scan
   const processedConsumer = kafka.consumer({ groupId: "backend-processed" });
