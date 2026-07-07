@@ -17,12 +17,12 @@ public class SpeedCalculatorProcessFunction
         private static final Logger LOG = LoggerFactory.getLogger(SpeedCalculatorProcessFunction.class);
 
         private static final double SPEEDLIMIT = 60.0;
-        private static final int WARMUP = 3;
+        private static final int WARMUP = 2;
         private static final double MAXSPEED = 150.0; // realistic taxi limit buffer
         private static final double PARKING = 180; // 3 minutes
         private static final double SECONDS_BEFOR_RESET = 600; // 10 minutes
-        private static final double ALPHA = 0.5;
-
+        private static final double TAU_SECONDS = 5.0 / Math.log(2.0); // seconds when previous and current is mixed
+                                                                       // 50/50
         private transient ValueState<Double> avarageTaxiSpeedKmh;
         private transient ValueState<Integer> count;
         private transient ValueState<Double> totalDistanceKm;
@@ -65,6 +65,25 @@ public class SpeedCalculatorProcessFunction
                                 curr.latitude, curr.longitude);
 
                 double speed = distance * 3600.0 / timeDiffSeconds;
+
+                return speed;
+        }
+
+        public static double speedCalc(
+                        TaxiLocation prev,
+                        TaxiLocation curr,
+                        double timeDiffSeconds,
+                        Double lastSpeed,
+                        Double tau) {
+
+                if (prev == null)
+                        return 0.0;
+
+                double speed = speedCalc(prev, curr, timeDiffSeconds);
+                if (lastSpeed != null) {
+                        double alpha = 1 - Math.exp(-timeDiffSeconds / tau);
+                        speed = alpha * speed + (1 - alpha) * lastSpeed;
+                }
 
                 return speed;
         }
@@ -135,7 +154,8 @@ public class SpeedCalculatorProcessFunction
                         return;
                 }
 
-                double speed = speedCalc(previous, current, timeDiffSeconds);
+                double speed = speedCalc(previous, current, timeDiffSeconds,
+                                lastSpeed.value(), TAU_SECONDS);
                 if (speed > MAXSPEED) {
 
                         LOG.warn("SPIKE_REJECTED taxi_id={} speed={} km/h distKm={} timeSec={}",
