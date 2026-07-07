@@ -226,7 +226,7 @@ def list_out_of_area():
 @app.get("/stats/latency")
 def latency_stats():
     """Durchschnittliche/max. End-to-End Pipeline-Latenz der letzten 5 Minuten,
-    basierend auf dem ingestedAt-Feld aus TaxiSpeed."""
+    basierend auf dem ingested_at-Feld aus TaxiSpeed."""
     sql = """
         SELECT
             AVG(EXTRACT(EPOCH FROM received_at) * 1000 - ingested_at) AS avg_latency_ms,

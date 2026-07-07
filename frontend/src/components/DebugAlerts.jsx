@@ -22,7 +22,7 @@ export function DebugAlerts({
   // Only show selected taxi alerts
   const visible = entries.filter((e) => {
     if (!filters[e.type]) return false;
-    if (selectedTaxiId !== null && String(e.taxiId) !== String(selectedTaxiId))
+    if (selectedTaxiId !== null && String(e.taxi_id) !== String(selectedTaxiId))
       return false;
     return true;
   });
@@ -54,21 +54,21 @@ export function DebugAlerts({
           {activeFilters.speeding &&
             speedingIncidents.map((i) => (
               <div
-                key={`s-${i.taxiId}`}
-                onClick={() => onSelectTaxi(i.taxiId)}
+                key={`s-${i.taxi_id}`}
+                onClick={() => onSelectTaxi(i.taxi_id)}
                 style={{ cursor: "pointer", fontSize: 11, padding: "2px 0" }}
               >
-                🚖 {i.taxiId} — {i.speed?.toFixed(1)} km/h
+                🚖 {i.taxi_id} — {i.speed?.toFixed(1)} km/h
               </div>
             ))}
           {activeFilters.area &&
             areaViolations.map((v) => (
               <div
-                key={`a-${v.taxiId}`}
-                onClick={() => onSelectTaxi(v.taxiId)}
+                key={`a-${v.taxi_id}`}
+                onClick={() => onSelectTaxi(v.taxi_id)}
                 style={{ cursor: "pointer", fontSize: 11, padding: "2px 0" }}
               >
-                🚖 {v.taxiId} — outside permitted area
+                🚖 {v.taxi_id} — outside permitted area
               </div>
             ))}
         </div>
@@ -163,13 +163,13 @@ export function DebugAlerts({
           visible.map((entry, i) => {
             const s = TAG_STYLES[entry.type];
             const clickable =
-              entry.taxiId !== null && entry.taxiId !== undefined;
+              entry.taxi_id !== null && entry.taxi_id !== undefined;
             const selected =
-              clickable && String(entry.taxiId) === String(selectedTaxiId);
+              clickable && String(entry.taxi_id) === String(selectedTaxiId);
             return (
               <div
                 key={i}
-                onClick={() => clickable && onSelectTaxi(entry.taxiId)}
+                onClick={() => clickable && onSelectTaxi(entry.taxi_id)}
                 style={{
                   display: "flex",
                   gap: 8,

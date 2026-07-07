@@ -114,7 +114,7 @@ public class SpeedCalculatorProcessFunction
                          * only out put stable data, so we need to wait for WARMUP times before we can
                          * TaxiSpeed first = new TaxiSpeed(current);
                          * 
-                         * first.ingestedAt = current.ingestedAt;
+                         * first.ingested_at = current.ingested_at;
                          * out.collect(first);
                          * output a result
                          */
@@ -133,7 +133,7 @@ public class SpeedCalculatorProcessFunction
                         count.update(1); // reset warmup after long gap
 
                         TaxiSpeed reset = new TaxiSpeed(current);
-                        reset.ingestedAt = current.ingestedAt;
+                        reset.ingested_at = current.ingested_at;
                         out.collect(reset);
                         return;
                 }
@@ -147,7 +147,7 @@ public class SpeedCalculatorProcessFunction
                          * information,
                          * lets assume if a taxi is only activ if its at leas sended WARMUP times
                          * TaxiSpeed warm = new TaxiSpeed(current);
-                         * warm.ingestedAt = current.ingestedAt;
+                         * warm.ingested_at = current.ingested_at;
                          * out.collect(warm);
                          * 
                          */
@@ -190,7 +190,7 @@ public class SpeedCalculatorProcessFunction
                 result.totalDistance = totalDistanceKm.value() == null ? 0.0 : totalDistanceKm.value();
                 result.curDistance = legDist;
                 result.isSpeeding = speed > SPEEDLIMIT;
-                result.ingestedAt = current.ingestedAt;
+                result.ingested_at = current.ingested_at;
 
                 if (speed > SPEEDLIMIT) {
                         ctx.output(SpeedCalculatorProcess.SPEEDING_TAG, result);

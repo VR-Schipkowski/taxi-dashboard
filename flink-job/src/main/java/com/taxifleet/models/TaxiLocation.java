@@ -17,7 +17,7 @@ public class TaxiLocation {
     // published to Kafka. Carried through the pipeline to measure end-to-end
     // latency.
     @JsonProperty("ingested_at")
-    public long ingestedAt;
+    public long ingested_at;
     public long eventTimeMillis;
 
     public TaxiLocation() {

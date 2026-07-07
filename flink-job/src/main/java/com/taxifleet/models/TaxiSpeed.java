@@ -21,7 +21,7 @@ public class TaxiSpeed extends TaxiLocation {
         this.eventTimeMillis = loc.eventTimeMillis;
         this.longitude = loc.longitude;
         this.latitude = loc.latitude;
-        this.ingestedAt = loc.ingestedAt;
+        this.ingested_at = loc.ingested_at;
     }
 
     @Override
