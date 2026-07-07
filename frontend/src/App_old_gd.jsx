@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import "./App.css";
 import "leaflet/dist/leaflet.css";
 
@@ -17,7 +17,6 @@ import { getOpacity, normalizeAlarmTaxi } from "./utils/helper.js";
 function App() {
   const now = useNow();
   const debugLog = useDebugLog();
-  const seenTaxiIdRef = useRef(new Set());
   const [selectedTaxiId, setSelectedTaxiId] = useState(null);
   const { pathLocations, pathError, appendLiveUpdate } =
     useTaxiPath(selectedTaxiId);
@@ -38,19 +37,13 @@ function App() {
         "taxiUpdate",
         `snapshot — ${data.taxis.length} taxis loaded`,
       );
-      seenTaxiIdRef.current = new Set(data.taxis.map((t) => String(t.taxi_id)));
     },
     onTaxiUpdate: (t) => {
-      const isNewTaxi = !seenTaxiIdRef.current.has(String(t.taxi_id));
-      if (isNewTaxi) {
-            debugLog.addEntry(
-            "taxiUpdate",
-            `NEW taxi ${t.taxi_id} appeared`,
-            // `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? " ⚡" : ""}${t.isParking ? " 🅿" : ""}`,
-            t.taxi_id,
-        );
-        seenTaxiIdRef.current.add(String(t.taxi_id));
-      }
+      debugLog.addEntry(
+        "taxiUpdate",
+        `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? " ⚡" : ""}${t.isParking ? " 🅿" : ""}`,
+        t.taxi_id,
+      );
       appendLiveUpdate(t);
     },
     onSpeedingAlert: (incidents) => {
@@ -106,6 +99,162 @@ function App() {
   function clearSelection() {
     setSelectedTaxiId(null);
   }
+
+  // Laedt die letzten PATH_LOCATIONS_LIMIT Standorte des ausgewaehlten Taxis
+  // aus der REST-API, sobald sich die Auswahl aendert.
+  useEffect(() => {
+    if (selectedTaxiId === null) {
+      setPathLocations([]);
+      setPathError(null);
+      return;
+    }
+
+    let cancelled = false;
+    setPathError(null);
+
+    fetch(`${API_BASE}/taxis/${selectedTaxiId}/locations?time_interval=${TIME_INTERVAL}&number=${PATH_LOCATIONS_LIMIT}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setPathLocations([...data]);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('error loading path:', err);
+        setPathLocations([]);
+        setPathError('could not load');
+      });
+
+    return () => { cancelled = true; };
+  }, [selectedTaxiId]);
+
+  useEffect(() => {
+    const socket = new WebSocket(wsLink);
+
+    socket.onopen = () => setStatus('Connected – Live-Stream active');
+
+    socket.onmessage = (event) => {
+      console.log(event.data);
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'snapshot') {
+          const map = {};
+          const seen = {};
+          const receivedAt = Date.now();
+          (data.taxis || []).forEach(t => {
+            map[t.taxi_id] = t;
+            seen[t.taxi_id] = receivedAt;
+          });
+          //setTaxiMap(map);
+          //setLastSeen(seen);
+          //seenTaxiIdRef.current = new Set(data.taxis.map( t => String(t.taxi_id)));
+          //setSpeedingIncidents(data.speedingIncidents || []);
+          //setAreaViolations(data.areaViolations || []);
+          addDebugEntry('taxiUpdate', `snapshot — ${data.taxis.length} taxis loaded`);
+
+          // Extract latency from initial snapshot and convert ms to seconds
+          if (data.stats && data.stats.avgLatencyMs) {
+            const initialLatency = data.stats.avgLatencyMs / 1000;
+            setLatency(initialLatency);
+            setLatencyHistory([initialLatency]);
+          }
+
+        } else if (data.type === 'taxiUpdate') {
+          const t = data.taxi;
+          setTaxiMap(prev => ({ ...prev, [t.taxi_id]: t }));
+          setLastSeen(prev => ({ ...prev, [t.taxi_id]: Date.now() }));
+          const newTaxi = !seenTaxiIdRef.current.has(String(t.taxi_id));
+          if (newTaxi) {
+              addDebugEntry(
+              'taxiUpdate',
+              `NEW taxi ${t.taxi_id} appeared`,
+              t.taxi_id
+              );
+              seenTaxiIdRef.current.add(String(t.taxi_id));
+          }
+          if (String(selectedTaxiIdRef.current) === String(data.taxi.taxi_id)) {
+            setPathLocations(prev => {
+
+              const updated = [
+
+                ...prev,
+                {
+                  latitude: t.latitude,
+                  longitude: t.longitude,
+                  timestamp: t.timestamp,
+                  speed: t.speed,
+                  averageSpeed: t.averageSpeed,
+                  totalDistance: t.totalDistance,
+                  isSpeeding: t.isSpeeding,
+                  isParking: t.isParking,
+                },
+              ];
+
+              return updated.slice(-PATH_LOCATIONS_LIMIT);
+            });
+          }
+
+        } else if (data.type === 'latencyStats') {
+          const newLatency = data.stats.avgLatencyMs / 1000; // Convert ms to seconds
+          setLatency(newLatency);
+
+          // Track trend by comparing with last values
+          setLatencyHistory(prev => {
+            const newHistory = [...prev, newLatency].slice(-5); // Keep last 5 values
+            if (newHistory.length >= 2) {
+              const previous = newHistory[newHistory.length - 2];
+              setLatencyTrend(newLatency > previous ? 'up' : newLatency < previous ? 'down' : null);
+            }
+            return newHistory;
+          });
+
+        } else if (data.type === 'speedingStarted') {
+          setSpeedingIncidents(prev => [...prev.filter(i => i.taxi_id !== data.taxi_id),
+              {
+                taxiId: data.taxiId,
+                latitude: data.latitude,
+                longitude: data.longitude,
+                timestamp: data.timestamp,
+                speed: data.speed,
+              }
+            ]);
+          
+          addDebugEntry(
+            'speeding',
+            `taxi ${data.taxiId} started speeding: ${data.speed.toFixed(1)} km/h`,
+            data.taxiId
+            );
+
+
+        } else if (data.type === 'speedingEnded') {
+          setSpeedingIncidents(prev => prev.filter(i => i.taxi_id !== data.taxi_id));
+          addDebugEntry(
+            'speeding',
+            `taxi ${data.taxiId} stopped speeding`,
+            data.taxiId
+            );
+
+        } else if (data.type === 'areaViolation') {
+          const v = data.areaViolations;
+          setAreaViolations(data.areaViolations || []);
+          v.forEach(violation => {
+            addDebugEntry('area', `taxi ${violation.taxiId} outside permitted area`, violation.taxiId);
+          });
+        }
+
+      } catch (error) {
+        console.error('Error parsing WebSocket data:', error);
+      }
+    };
+
+    socket.onclose = () => setStatus('Lost connection to backend');
+
+    return () => socket.close();
+  }, []);
 
   const allTaxis = Object.values(taxiMap);
 
