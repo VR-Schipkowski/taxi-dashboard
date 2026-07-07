@@ -50,8 +50,8 @@ function App() {
       incidents.forEach((i) => {
         debugLog.addEntry(
           "speeding",
-          `taxi ${i.taxiId} — ${i.speed.toFixed(1)} km/h`,
-          i.taxiId,
+          `taxi ${i.taxi_id} — ${i.speed.toFixed(1)} km/h`,
+          i.taxi_id,
         );
       });
     },
@@ -59,8 +59,8 @@ function App() {
       violations.forEach((v) => {
         debugLog.addEntry(
           "area",
-          `taxi ${v.taxiId} outside permitted area`,
-          v.taxiId,
+          `taxi ${v.taxi_id} outside permitted area`,
+          v.taxi_id,
         );
       });
     },
@@ -85,15 +85,15 @@ function App() {
     setActiveFilters((prev) => ({ ...prev, [type]: !prev[type] }));
   }
 
-  function selectTaxiFromAlert(taxiId) {
+  function selectTaxiFromAlert(taxi_id) {
     setSelectedTaxiId((prev) =>
-      String(prev) === String(taxiId) ? null : taxiId,
+      String(prev) === String(taxi_id) ? null : taxi_id,
     );
   }
 
   // Used both by the search box and by clicking a marker/alert.
-  function selectTaxi(taxiId) {
-    setSelectedTaxiId(taxiId);
+  function selectTaxi(taxi_id) {
+    setSelectedTaxiId(taxi_id);
   }
 
   function clearSelection() {
@@ -103,7 +103,7 @@ function App() {
   const allTaxis = Object.values(taxiMap);
 
   const violatingTaxiIds = useMemo(
-    () => new Set(areaViolations.map((v) => String(v.taxiId))),
+    () => new Set(areaViolations.map((v) => String(v.taxi_id))),
     [areaViolations],
   );
 
@@ -122,13 +122,13 @@ function App() {
     const violatorMap = {};
     if (activeFilters.speeding) {
       speedingIncidents.forEach((i) => {
-        violatorMap[i.taxiId] = normalizeAlarmTaxi(i);
+        violatorMap[i.taxi_id] = normalizeAlarmTaxi(i);
       });
     }
     if (activeFilters.area) {
       areaViolations.forEach((v) => {
-        violatorMap[v.taxiId] = {
-          ...violatorMap[v.taxiId],
+        violatorMap[v.taxi_id] = {
+          ...violatorMap[v.taxi_id],
           ...normalizeAlarmTaxi(v),
         };
       });
