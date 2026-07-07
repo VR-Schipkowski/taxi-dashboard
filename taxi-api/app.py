@@ -38,7 +38,7 @@ INSERT INTO taxi_speed (
 ) VALUES (
     %(taxi_id)s, %(timestamp)s, %(longitude)s, %(latitude)s, %(speed)s,
     %(averageSpeed)s, %(totalDistance)s, %(isSpeeding)s, %(isOutOfArea)s,
-    %(lastMoved)s, %(isParking)s, %(ingestedAt)s
+    %(lastMoved)s, %(isParking)s, %(ingested_at)s
 )
 """
 
