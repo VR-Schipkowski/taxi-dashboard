@@ -1,4 +1,5 @@
 # Kafka Contract & Architecture Overview
+
 //TODO: UPDATE
 This file explains the architecture of the pipeline, the Kafka topic contracts,
 the WebSocket protocol, and who is responsible for what.
@@ -18,20 +19,21 @@ Data Provider → Kafka (taxi-locations) → Flink ──→ Redis (Store Inform
 
 **Key decisions:**
 
-| Decision | Reason |
-|---|---|
-| Flink writes every event to Redis | Professor's topology — "Store Information" operator |
+| Decision                                                  | Reason                                                                  |
+| --------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Flink writes every event to Redis                         | Professor's topology — "Store Information" operator                     |
 | `taxi-processed` is throttled to 1 update per taxi per 5s | Professor's topology — "Propagate location information every 5 seconds" |
-| `taxi-speeding` and `taxi-area-violations` are immediate | Alerts must not be delayed by the throttle window |
-| Backend does NOT write to Redis | Flink is the single writer — avoids race conditions |
-| Backend reads Redis only when a new client connects | Snapshot so the map is not empty on first load |
-| Backend broadcasts single-taxi events over WebSocket | Avoids full Redis scan on every Kafka event (OOM fix) |
+| `taxi-speeding` and `taxi-area-violations` are immediate  | Alerts must not be delayed by the throttle window                       |
+| Backend does NOT write to Redis                           | Flink is the single writer — avoids race conditions                     |
+| Backend reads Redis only when a new client connects       | Snapshot so the map is not empty on first load                          |
+| Backend broadcasts single-taxi events over WebSocket      | Avoids full Redis scan on every Kafka event (OOM fix)                   |
 
 ---
 
 ## Kafka Topics
 
 ### `taxi-locations`
+
 **Producer:** Data provider
 **Consumer:** Flink
 
@@ -39,7 +41,7 @@ Raw GPS data replayed from the T-drive dataset in timestamp order.
 
 ```json
 {
-  "taxiId": 31,
+  "taxi_id": 31,
   "timestamp": "2008-02-02 13:59:00",
   "latitude": 39.9163,
   "longitude": 116.3972
@@ -49,6 +51,7 @@ Raw GPS data replayed from the T-drive dataset in timestamp order.
 ---
 
 ### `taxi-processed`
+
 **Producer:** Flink (throttled — one update per taxi per 5-second window)
 **Consumer:** Backend
 
@@ -57,7 +60,7 @@ The 5s throttle means the latest event per taxi per window is forwarded — not 
 
 ```json
 {
-  "taxiId": 31,
+  "taxi_id": 31,
   "timestamp": "2008-02-02 13:59:00",
   "latitude": 39.9163,
   "longitude": 116.3972,
@@ -72,6 +75,7 @@ The 5s throttle means the latest event per taxi per window is forwarded — not 
 ```
 
 Field notes:
+
 - `speed` — instantaneous speed for this event (km/h)
 - `averageSpeed` — rolling average speed for this taxi (km/h)
 - `totalDistance` — cumulative distance traveled (km)
@@ -83,6 +87,7 @@ Field notes:
 ---
 
 ### `taxi-speeding`
+
 **Producer:** Flink (immediate — side output, bypasses 5s throttle)
 **Consumer:** Backend
 
@@ -90,10 +95,10 @@ Published the moment a taxi exceeds **60 km/h**. Same full schema as `taxi-proce
 
 ```json
 {
-  "taxiId": 42,
+  "taxi_id": 42,
   "timestamp": "2008-02-02 14:01:00",
-  "latitude": 39.9200,
-  "longitude": 116.4100,
+  "latitude": 39.92,
+  "longitude": 116.41,
   "speed": 67.3,
   "averageSpeed": 51.0,
   "totalDistance": 5.1,
@@ -107,6 +112,7 @@ Published the moment a taxi exceeds **60 km/h**. Same full schema as `taxi-proce
 ---
 
 ### `taxi-area-violations`
+
 **Producer:** Flink (immediate — side output, bypasses 5s throttle)
 **Consumer:** Backend
 
@@ -115,10 +121,10 @@ Same full schema as `taxi-processed`.
 
 ```json
 {
-  "taxiId": 815,
+  "taxi_id": 815,
   "timestamp": "2008-02-02 14:05:00",
-  "latitude": 40.0500,
-  "longitude": 116.1200,
+  "latitude": 40.05,
+  "longitude": 116.12,
   "speed": 38.0,
   "averageSpeed": 29.4,
   "totalDistance": 22.7,
@@ -165,11 +171,9 @@ Full current state read from Redis. Use this to populate the initial map.
     "totalDistance": 9823.4
   },
   "speedingIncidents": [
-    { "taxiId": 42, "speed": 67.3, "timestamp": "2008-02-02 14:01:00" }
+    { "taxi_id": 42, "speed": 67.3, "timestamp": "2008-02-02 14:01:00" }
   ],
-  "areaViolations": [
-    { "taxiId": 815, "timestamp": "2008-02-02 14:05:00" }
-  ]
+  "areaViolations": [{ "taxi_id": 815, "timestamp": "2008-02-02 14:05:00" }]
 }
 ```
 
@@ -208,12 +212,12 @@ Use `incident` for the new event. Use `speedingIncidents` to replace the full li
 {
   "type": "speedingAlert",
   "incident": {
-    "taxiId": 42,
+    "taxi_id": 42,
     "speed": 67.3,
     "timestamp": "2008-02-02 14:01:00"
   },
   "speedingIncidents": [
-    { "taxiId": 42, "speed": 67.3, "timestamp": "2008-02-02 14:01:00" }
+    { "taxi_id": 42, "speed": 67.3, "timestamp": "2008-02-02 14:01:00" }
   ]
 }
 ```
@@ -228,12 +232,10 @@ Use `violation` for the new event. Use `areaViolations` to replace the full list
 {
   "type": "areaViolation",
   "violation": {
-    "taxiId": 815,
+    "taxi_id": 815,
     "timestamp": "2008-02-02 14:05:00"
   },
-  "areaViolations": [
-    { "taxiId": 815, "timestamp": "2008-02-02 14:05:00" }
-  ]
+  "areaViolations": [{ "taxi_id": 815, "timestamp": "2008-02-02 14:05:00" }]
 }
 ```
 
@@ -241,18 +243,18 @@ Use `violation` for the new event. Use `areaViolations` to replace the full list
 
 ## Frontend Field Guide
 
-| Field | Source message | Use for |
-|---|---|---|
-| `taxi.taxi_id` | snapshot, taxiUpdate | Map key, display ID |
-| `taxi.latitude` / `taxi.longitude` | snapshot, taxiUpdate | Leaflet Marker position |
-| `taxi.speed` | snapshot, taxiUpdate | Current speed display |
-| `taxi.averageSpeed` | snapshot, taxiUpdate | Average speed display |
-| `taxi.totalDistance` | snapshot, taxiUpdate | Total distance display |
-| `taxi.isSpeeding` | snapshot, taxiUpdate | Speeding marker color |
-| `taxi.isParking` | snapshot, taxiUpdate | Parking marker icon |
-| `taxi.isOutOfArea` | snapshot | Area violation marker (not in taxiUpdate) |
-| `speedingIncidents[]` | snapshot, speedingAlert | Speeding panel list |
-| `areaViolations[]` | snapshot, areaViolation | Area violation panel list |
+| Field                              | Source message          | Use for                                   |
+| ---------------------------------- | ----------------------- | ----------------------------------------- |
+| `taxi.taxi_id`                     | snapshot, taxiUpdate    | Map key, display ID                       |
+| `taxi.latitude` / `taxi.longitude` | snapshot, taxiUpdate    | Leaflet Marker position                   |
+| `taxi.speed`                       | snapshot, taxiUpdate    | Current speed display                     |
+| `taxi.averageSpeed`                | snapshot, taxiUpdate    | Average speed display                     |
+| `taxi.totalDistance`               | snapshot, taxiUpdate    | Total distance display                    |
+| `taxi.isSpeeding`                  | snapshot, taxiUpdate    | Speeding marker color                     |
+| `taxi.isParking`                   | snapshot, taxiUpdate    | Parking marker icon                       |
+| `taxi.isOutOfArea`                 | snapshot                | Area violation marker (not in taxiUpdate) |
+| `speedingIncidents[]`              | snapshot, speedingAlert | Speeding panel list                       |
+| `areaViolations[]`                 | snapshot, areaViolation | Area violation panel list                 |
 
 ---
 
@@ -260,15 +262,15 @@ Use `violation` for the new event. Use `areaViolations` to replace the full list
 
 Flink is the **only writer**. The backend only reads Redis.
 
-| Scenario | What happens |
-|---|---|
-| Live update for connected clients | Kafka → Backend → WebSocket (instant, no Redis involved) |
-| New browser connects | Backend reads all `taxi:speed:*` keys from Redis → sends `snapshot` |
-| Backend restarts | Same as above — Redis is the recovery point |
+| Scenario                          | What happens                                                        |
+| --------------------------------- | ------------------------------------------------------------------- |
+| Live update for connected clients | Kafka → Backend → WebSocket (instant, no Redis involved)            |
+| New browser connects              | Backend reads all `taxi:speed:*` keys from Redis → sends `snapshot` |
+| Backend restarts                  | Same as above — Redis is the recovery point                         |
 
 Redis keys expire after **60 seconds**. A taxi that stops sending GPS events disappears from the map naturally.
 
-Key format: `taxi:speed:<taxiId>` (Redis hash)
+Key format: `taxi:speed:<taxi_id>` (Redis hash)
 
 Fields stored per taxi: `latitude`, `longitude`, `speed`, `averageSpeed`, `distance`, `totalDistance`, `timestamp`, `isSpeeding`, `isOutOfArea`, `isParking`, `lastMoved`
 

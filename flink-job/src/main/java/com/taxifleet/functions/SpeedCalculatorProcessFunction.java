@@ -17,17 +17,22 @@ public class SpeedCalculatorProcessFunction
         private static final Logger LOG = LoggerFactory.getLogger(SpeedCalculatorProcessFunction.class);
 
         private static final double SPEEDLIMIT = 60.0;
-        private static final int WARMUP = 3;
+        private static final int WARMUP = 2;
         private static final double MAXSPEED = 150.0; // realistic taxi limit buffer
         private static final double PARKING = 180; // 3 minutes
-
+        private static final double SECONDS_BEFOR_RESET = 600; // 10 minutes
+        private static final double TAU_SECONDS = 5.0 / Math.log(2.0); // seconds when previous and current is mixed
+                                                                       // 50/50
         private transient ValueState<Double> avarageTaxiSpeedKmh;
         private transient ValueState<Integer> count;
         private transient ValueState<Double> totalDistanceKm;
         private transient ValueState<Integer> speedSampleCount;
         private transient ValueState<TaxiLocation> previousLocation;
-        private transient ValueState<String> lastMoved;
+        private transient ValueState<Long> lastMovedEventTimeMillis;
+        private transient ValueState<Double> lastSpeed;
 
+        // ToDo :right now we filter out a lot of data during warmup phase, this is good
+        // for the frontend, we should think how to get these also to the db
         @Override
         public void open(Configuration parameters) {
                 ValueStateDescriptor<TaxiLocation> descriptor = new ValueStateDescriptor<>("previous-location",
@@ -41,7 +46,10 @@ public class SpeedCalculatorProcessFunction
                                 .getState(new ValueStateDescriptor<>("total-distance-km", Double.class));
                 speedSampleCount = getRuntimeContext()
                                 .getState(new ValueStateDescriptor<>("speed-sample-count", Integer.class));
-                lastMoved = getRuntimeContext().getState(new ValueStateDescriptor<>("last-moved", String.class));
+                lastMovedEventTimeMillis = getRuntimeContext()
+                                .getState(new ValueStateDescriptor<>("last-moved", Long.class));
+                lastSpeed = getRuntimeContext()
+                                .getState(new ValueStateDescriptor<>("last-speed", Double.class));
         }
 
         public static double speedCalc(
@@ -61,6 +69,25 @@ public class SpeedCalculatorProcessFunction
                 return speed;
         }
 
+        public static double speedCalc(
+                        TaxiLocation prev,
+                        TaxiLocation curr,
+                        double timeDiffSeconds,
+                        Double lastSpeed,
+                        Double tau) {
+
+                if (prev == null)
+                        return 0.0;
+
+                double speed = speedCalc(prev, curr, timeDiffSeconds);
+                if (lastSpeed != null) {
+                        double alpha = 1 - Math.exp(-timeDiffSeconds / tau);
+                        speed = alpha * speed + (1 - alpha) * lastSpeed;
+                }
+
+                return speed;
+        }
+
         @Override
         public void processElement(
                         TaxiLocation current,
@@ -76,76 +103,63 @@ public class SpeedCalculatorProcessFunction
                         c = 0;
                 if (totalDistanceKm.value() == null)
                         totalDistanceKm.update(0.0);
-                if (lastMoved.value() == null)
-                        lastMoved.update("1897-02-02 13:33:08");
+                if (lastMovedEventTimeMillis.value() == null) {
+                        lastMovedEventTimeMillis.update(0L);
+                }
+
                 if (previous == null) {
                         count.update(0);
                         previousLocation.update(current);
-
-                        TaxiSpeed first = new TaxiSpeed(
-                                        current.taxiId,
-                                        current.timestamp,
-                                        current.longitude,
-                                        current.latitude,
-                                        0.0,
-                                        0.0,
-                                        0.0,
-                                        0.0);
-                        first.ingestedAt = current.ingestedAt;
-                        out.collect(first);
-
+                        /*
+                         * only out put stable data, so we need to wait for WARMUP times before we can
+                         * TaxiSpeed first = new TaxiSpeed(current);
+                         * 
+                         * first.ingested_at = current.ingested_at;
+                         * out.collect(first);
+                         * output a result
+                         */
                         return;
                 }
 
-                double timeDiffSeconds = Helper.calculateTimeDifferenceSeconds(previous.timestamp, current.timestamp);
+                double timeDiffSeconds = (current.eventTimeMillis - previous.eventTimeMillis) / 1000.0;
                 if (timeDiffSeconds <= 0) {
-                        LOG.warn("DROP_INVALID_TIME taxiId={} prevTs={} currTs={}",
-                                        current.taxiId, previous.timestamp, current.timestamp);
+                        LOG.warn("DROP_INVALID_TIME taxi_id={} prevTs={} currTs={}",
+                                        current.taxi_id, previous.timestamp, current.timestamp);
                         return;
                 }
-                if (timeDiffSeconds > 300) {
-                        LOG.warn("DROP_OLD_DATA taxiId={} timeDiffSec={}", current.taxiId, timeDiffSeconds);
+                if (timeDiffSeconds > SECONDS_BEFOR_RESET) {
+                        LOG.warn("DROP_OLD_DATA taxi_id={} timeDiffSec={}", current.taxi_id, timeDiffSeconds);
                         previousLocation.update(current);
                         count.update(1); // reset warmup after long gap
 
-                        TaxiSpeed reset = new TaxiSpeed(
-                                        current.taxiId,
-                                        current.timestamp,
-                                        current.longitude,
-                                        current.latitude,
-                                        0.0,
-                                        0.0,
-                                        0.0,
-                                        0.0);
-                        reset.ingestedAt = current.ingestedAt;
+                        TaxiSpeed reset = new TaxiSpeed(current);
+                        reset.ingested_at = current.ingested_at;
                         out.collect(reset);
                         return;
                 }
-                double speed = speedCalc(previous, current, timeDiffSeconds);
 
                 if (c < WARMUP) {
-                        if (speed <= MAXSPEED) {
-                                previousLocation.update(current);
-                                count.update(c + 1);
 
-                        }
-                        TaxiSpeed warm = new TaxiSpeed(
-                                        current.taxiId,
-                                        current.timestamp,
-                                        current.longitude,
-                                        current.latitude,
-                                        0.0,
-                                        0.0,
-                                        0.0, 0.0);
-                        warm.ingestedAt = current.ingestedAt;
-                        out.collect(warm);
+                        previousLocation.update(current);
+                        count.update(c + 1);
+                        /*
+                         * lots of taxis sends once and then stop for a long time, for meningfull
+                         * information,
+                         * lets assume if a taxi is only activ if its at leas sended WARMUP times
+                         * TaxiSpeed warm = new TaxiSpeed(current);
+                         * warm.ingested_at = current.ingested_at;
+                         * out.collect(warm);
+                         * 
+                         */
                         return;
                 }
 
+                double speed = speedCalc(previous, current, timeDiffSeconds,
+                                lastSpeed.value(), TAU_SECONDS);
                 if (speed > MAXSPEED) {
 
-                        LOG.warn("SPIKE_REJECTED taxiId={} speed={} km/h distKm={} timeSec={}",
-                                        current.taxiId, speed, timeDiffSeconds);
+                        LOG.warn("SPIKE_REJECTED taxi_id={} speed={} km/h distKm={} timeSec={}",
+                                        current.taxi_id, speed, timeDiffSeconds);
 
                         // IMPORTANT:
                         // do NOT update state → prevents poisoning future calculations
@@ -170,34 +184,27 @@ public class SpeedCalculatorProcessFunction
                 speedSampleCount.update(samples + 1);
 
                 // create final result taxi object
-                TaxiSpeed result = new TaxiSpeed(
-                                current.taxiId,
-                                current.timestamp,
-                                current.longitude,
-                                current.latitude,
-                                speed,
-                                legDist,
-                                totalDistanceKm.value() == null ? 0.0 : totalDistanceKm.value(),
-                                avarageTaxiSpeedKmh.value() == null ? 0.0 : avarageTaxiSpeedKmh.value());
-
-                result.ingestedAt = current.ingestedAt;
+                TaxiSpeed result = new TaxiSpeed(current);
+                result.speed = speed;
+                result.averageSpeed = newAvg;
+                result.totalDistance = totalDistanceKm.value() == null ? 0.0 : totalDistanceKm.value();
+                result.curDistance = legDist;
+                result.isSpeeding = speed > SPEEDLIMIT;
+                result.ingested_at = current.ingested_at;
 
                 if (speed > SPEEDLIMIT) {
                         ctx.output(SpeedCalculatorProcess.SPEEDING_TAG, result);
                 }
-                if (speed > 0.5) {
-                        lastMoved.update(current.timestamp);
+                if (speed > 2.0) {
+                        lastMovedEventTimeMillis.update(current.eventTimeMillis);
                         result.lastMoved = current.timestamp;
                         result.isParking = false;
                 } else {
-                        String lastMovedTs = lastMoved.value();
-
-                        double parkedSeconds = Helper.calculateTimeDifferenceSeconds(lastMovedTs,
-                                        current.timestamp);
-                        if (parkedSeconds > PARKING) {
+                        long lastMovedMillis = lastMovedEventTimeMillis.value();
+                        double parkedSeconds = (current.eventTimeMillis - lastMovedMillis) / 1000.0;
+                        if (lastMovedMillis > 0 && parkedSeconds > PARKING) {
                                 result.isParking = true;
                         }
-                        result.lastMoved = lastMovedTs;
                 }
 
                 out.collect(result);

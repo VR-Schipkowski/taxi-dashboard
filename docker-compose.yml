@@ -16,7 +16,14 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_LOG_RETENTION_BYTES: 3221225472
     healthcheck:
-      test: [ "CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "kafka:9092", "--list" ]
+      test:
+        [
+          "CMD",
+          "/opt/kafka/bin/kafka-topics.sh",
+          "--bootstrap-server",
+          "kafka:9092",
+          "--list",
+        ]
 
   kafka-init:
     image: apache/kafka:3.9.0
@@ -36,7 +43,7 @@ services:
       kafka-init:
         condition: service_completed_successfully
     volumes:
-    #  - "./provider/data/test/taxi-data:/taxi-data:ro"
+      #- "./provider/data/test/taxi-data:/taxi-data:ro"
       - "./provider/data/release/taxi_log_2008_by_id:/taxi-data:ro"
     command: --data-dir /taxi-data --bootstrap-servers kafka:9092 --speed-factor 1
     ulimits:
@@ -82,7 +89,7 @@ services:
     environment:
       FLINK_PROPERTIES: "jobmanager.rpc.address: flink-jobmanager"
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8081" ]
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -119,7 +126,7 @@ services:
       - "6379:6379"
     command: redis-server --save "" --appendonly no
     healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
+      test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -129,7 +136,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    entrypoint: [ "redis-cli", "-h", "redis", "FLUSHALL" ]
+    entrypoint: ["redis-cli", "-h", "redis", "FLUSHALL"]
     restart: "no"
 
   postgres:
@@ -145,7 +152,7 @@ services:
     ports:
       - "5432:5432"
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U taxi -d taxifleet" ]
+      test: ["CMD-SHELL", "pg_isready -U taxi -d taxifleet"]
       interval: 5s
       timeout: 5s
       retries: 5

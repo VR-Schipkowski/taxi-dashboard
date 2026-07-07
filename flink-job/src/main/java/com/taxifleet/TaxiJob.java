@@ -38,33 +38,29 @@ public class TaxiJob {
                                 source,
                                 WatermarkStrategy.noWatermarks(),
                                 "Kafka Taxi Source");
-                // Todo : maybe better to reuse object mapper if possible
-                // ToDo: dont know if filtering is necessary, we could do the out of area check,
-                // this also decreases the amount of data send to speed calcolations
-                // here and then only further process the data inside the area
-                // no double check, but maybe we want to filter out invalid data before doing
-                // any processing
+                // reordering incomming data, and filtering out invalid data, also parsing the
+                // json into TaxiLocation objects
                 DataStream<TaxiLocation> locationStream = kafkaStream
-                                .map(json -> {
-                                        ObjectMapper mapper = new ObjectMapper();
-                                        return mapper.readValue(json, TaxiLocation.class);
-                                })
-                                .filter(location -> location.latitude >= -90 &&
-                                                location.latitude <= 90 &&
-                                                location.longitude >= -180 &&
-                                                location.longitude <= 180 &&
-                                                location.latitude != 0.0 &&
-                                                location.longitude != 0.0)
-                                .name("Parse JSON and Filter Invalid Locations");
+                                .flatMap(new LocationParser())
+                                .name("Parse JSON and Filter Invalid Locations")
+                                .assignTimestampsAndWatermarks(
+                                                WatermarkStrategy
+                                                                .<TaxiLocation>forBoundedOutOfOrderness(
+                                                                                Duration.ofSeconds(2))
+                                                                .withTimestampAssigner((loc,
+                                                                                recordTimestamp) -> loc.eventTimeMillis));
+
+                // out of area first, less comutation
+
                 // Todo : reasoning for windowing, maybe instead of sending last we could use
                 // the windows to denoise the position also we have a throtteling later on
                 DataStream<TaxiLocation> filteredLocationStream = locationStream
-                                .keyBy(location -> location.taxiId)
+                                .keyBy(location -> location.taxi_id)
                                 .window(TumblingProcessingTimeWindows.of(Duration.ofSeconds(5)))
                                 .maxBy("timestamp");
 
                 SingleOutputStreamOperator<TaxiSpeed> speedStream = filteredLocationStream
-                                .keyBy(location -> location.taxiId)
+                                .keyBy(location -> location.taxi_id)
                                 .process(new SpeedCalculatorProcessFunction());
 
                 ObjectMapper mapper = new ObjectMapper();
@@ -88,7 +84,7 @@ public class TaxiJob {
                 // connection lifecycle per task.
                 // Notify area violation — immediate, side output from OutOfAreaProcessFunction
                 SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
-                                .keyBy(speed -> speed.taxiId)
+                                .keyBy(speed -> speed.taxi_id)
                                 .process(new OutOfAreaProcessFunction());
                 DataStream<TaxiSpeed> outOfAreaStream = outOfAreaCheckedStream
                                 .getSideOutput(OutOfAreaProcess.OUT_OF_AREA_TAG);
@@ -116,7 +112,7 @@ public class TaxiJob {
                 // seconds (not sending OOA taxis)
                 // Todo: why throttle again already done in the front
                 DataStream<TaxiSpeed> throttledStream = outOfAreaCheckedStream
-                                .keyBy(speed -> speed.taxiId)
+                                .keyBy(speed -> speed.taxi_id)
                                 .window(TumblingProcessingTimeWindows.of(Duration.ofSeconds(5)))
                                 .maxBy("timestamp");
 

@@ -8,12 +8,12 @@ export function getOpacity(lastSeenTime, now) {
   return 1 - age / STALE_AFTER_MS;
 }
 
-// Converts a speeding-incident / area-violation record (taxiId, ...) into
+// Converts a speeding-incident / area-violation record (taxi_id, ...) into
 // the same shape as a regular taxi record (taxi_id, ...) so both can be
 // rendered by the same marker list.
 export function normalizeAlarmTaxi(a) {
   return {
-    taxi_id: String(a.taxiId),
+    taxi_id: String(a.taxi_id),
     latitude: a.latitude,
     longitude: a.longitude,
     speed: a.speed,
