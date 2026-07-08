@@ -35,6 +35,7 @@ function RecenterMap({ selectedTaxi }) {
 
 // Renders the full live map: base tiles, clustered taxi markers, the
 // selected taxi's recent path, and auto-recentering on selection.
+//TODO: adding is parking if taxi is cliced
 export function MapView({
   taxiMap,
   taxis,
@@ -64,7 +65,7 @@ export function MapView({
         iconCreateFunction={createClusterIcon}
         maxClusterRadius={60}
         spiderfyOnMaxZoom={true}
-        disableClusteringAtZoom={16}
+        disableClusteringAtZoom={20}
         showCoverageOnHover={false}
       >
         {selectedTaxiId !== null && pathPositions.length > 1 && (

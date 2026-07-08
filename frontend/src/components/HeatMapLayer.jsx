@@ -14,11 +14,11 @@ export function HeatMapLayer({ cells }) {
     });
 
     const heatLayer = L.heatLayer(points, {
-      radius: 65,
-      blur: 35,
-      maxZoom: 17,
+      radius: 100,
+      blur: 25,
+      maxZoom: 5,
       // max: 40.0, //TODO: this is a magic number, should be configurable
-      max: 40.0,
+      max: 50.0,
     }).addTo(map);
 
     return () => {
