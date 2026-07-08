@@ -28,12 +28,12 @@ public class TaxiJob {
 
         private static KafkaSink<String> createKafkaSink(String topic) {
                 return KafkaSink.<String>builder()
-                        .setBootstrapServers(BOOTSTRAP_SERVERS)
-                        .setRecordSerializer(KafkaRecordSerializationSchema.builder()
-                                .setTopic(topic)
-                                .setValueSerializationSchema(new SimpleStringSchema())
-                                .build())
-                        .build();
+                                .setBootstrapServers(BOOTSTRAP_SERVERS)
+                                .setRecordSerializer(KafkaRecordSerializationSchema.builder()
+                                                .setTopic(topic)
+                                                .setValueSerializationSchema(new SimpleStringSchema())
+                                                .build())
+                                .build();
         }
 
         private static DataStream<String> createKafkaSource(StreamExecutionEnvironment env) {
@@ -45,86 +45,101 @@ public class TaxiJob {
                                 .setValueOnlyDeserializer(new SimpleStringSchema())
                                 .build();
                 return env.fromSource(
-                        source,
+                                source,
                                 WatermarkStrategy.noWatermarks(),
-                                "Kafka Taxi Source"
-                );
+                                "Kafka Taxi Source");
         }
 
         private static DataStream<TaxiLocation> parseLocations(DataStream<String> rawStream) {
                 return rawStream
-                        .flatMap(new LocationParser())
-                        .name("Parse JSON and Filter Invalid Locations")
-                        .assignTimestampsAndWatermarks(
-                                        WatermarkStrategy.<TaxiLocation>forBoundedOutOfOrderness(WATERMARK_BOUND)
-                                                .withTimestampAssigner((loc,recordTimestamp) -> loc.eventTimeMillis));                            
+                                .flatMap(new LocationParser())
+                                .name("Parse JSON and Filter Invalid Locations")
+                                .assignTimestampsAndWatermarks(
+                                                WatermarkStrategy
+                                                                .<TaxiLocation>forBoundedOutOfOrderness(WATERMARK_BOUND)
+                                                                .withTimestampAssigner((loc,
+                                                                                recordTimestamp) -> loc.eventTimeMillis));
         }
 
         private static DataStream<TaxiLocation> throttleLocations(DataStream<TaxiLocation> locations) {
                 return locations
-                        .keyBy(location -> location.taxi_id)
-                        .window(TumblingProcessingTimeWindows.of(WINDOW_DURATION))
-                        .maxBy("timestamp");
+                                .keyBy(location -> location.taxi_id)
+                                .window(TumblingProcessingTimeWindows.of(WINDOW_DURATION))
+                                .maxBy("timestamp");
         }
 
-        private static SingleOutputStreamOperator<TaxiSpeed> calculateSpeed(DataStream<TaxiLocation> filteredLocationStream) {
+        private static SingleOutputStreamOperator<TaxiSpeed> calculateSpeed(
+                        DataStream<TaxiLocation> filteredLocationStream) {
                 return filteredLocationStream
-                        .keyBy(location -> location.taxi_id)
-                        .process(new SpeedCalculatorProcessFunction());  
+                                .keyBy(location -> location.taxi_id)
+                                .process(new SpeedCalculatorProcessFunction())
+                                .name("Calculate Speed and Detect Speeding");
         }
 
         private static void storeToRedis(SingleOutputStreamOperator<TaxiSpeed> speedStream) {
-               speedStream
-                        .process(new RedisSinkFunction())
-                        .name("Store Information to Redis");
+                speedStream
+                                .process(new RedisSinkFunction())
+                                .name("Store Information to Redis");
         }
-        // TODO: currently we do not have parallelism since active alarmssweepfunction cannot handle it
+
+        // TODO: currently we do not have parallelism since active alarmssweepfunction
+        // cannot handle it
         private static void processOOAViolations(SingleOutputStreamOperator<TaxiSpeed> speedStream,
-                KafkaSink<String> violationsSink) {
+                        KafkaSink<String> violationsSink) {
                 SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
-                        .keyBy(speed -> speed.taxi_id)
-                        .process(new OutOfAreaProcessFunction());
+                                .keyBy(speed -> speed.taxi_id)
+                                .process(new OutOfAreaProcessFunction());
                 DataStream<TaxiSpeed> outOfAreaStream = outOfAreaCheckedStream
-                        .getSideOutput(OutOfAreaProcess.OUT_OF_AREA_TAG);
+                                .getSideOutput(OutOfAreaProcess.OUT_OF_AREA_TAG);
                 DataStream<String> areaSnapshot = outOfAreaStream
-                        .keyBy(speed -> 0)
-                        .process(new ActiveAlarmsSweepFunction())
-                        .setParallelism(1)
-                        .name("Area Active Alarms Snapshot");
+                                .keyBy(speed -> 0)
+                                .process(new ActiveAlarmsSweepFunction())
+                                .setParallelism(1)
+                                .name("Area Active Alarms Snapshot");
                 areaSnapshot.sinkTo(violationsSink).name("Notify Area Violation");
         }
-        // TODO: currently we do not have parallelism since active alarmssweepfunction cannot handle it
+
+        // TODO: currently we do not have parallelism since active alarmssweepfunction
+        // cannot handle it
         private static void processSpeedingViolations(SingleOutputStreamOperator<TaxiSpeed> speedStream,
-                KafkaSink<String> speedingSink) {
-                        DataStream<TaxiSpeed> speedingStream = speedStream
+                        KafkaSink<String> speedingSink) {
+                DataStream<TaxiSpeed> speedingStream = speedStream
                                 .getSideOutput(SpeedCalculatorProcess.SPEEDING_TAG);
-                        DataStream<String> speedingSnapshot = speedingStream
+                DataStream<String> speedingSnapshot = speedingStream
                                 .keyBy(speed -> 0)
                                 .process(new ActiveAlarmsSweepFunction())
                                 .setParallelism(1)
                                 .name("Speeding Active Alarms Snapshot");
-                        speedingSnapshot.sinkTo(speedingSink).name("Notify Speeding");
+                speedingSnapshot.sinkTo(speedingSink).name("Notify Speeding");
 
         }
-        private static void processHeatmap(DataStream<TaxiSpeed> locationStream, KafkaSink<String> heatmapSink, ObjectMapper mapper) {
-                // Heatmap — distinct taxi count per cell, sliding window
-                DataStream<HeatmapCell> heatmapStream = HeatmapPipeline.build(locationStream);
-                
-                heatmapStream.map(mapper::writeValueAsString).sinkTo(heatmapSink)
-                                .name("Heatmap Distinct Taxi Count per Cell");
-}
 
         private static void propagateToDashboard(SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream,
-                KafkaSink<String> processedSink, ObjectMapper mapper) {
-                        outOfAreaCheckedStream
-                                .map(mapper::writeValueAsString)
+                        KafkaSink<String> processedSink, ObjectMapper mapper) {
+                outOfAreaCheckedStream
+                                .map((TaxiSpeed speed) -> mapper.writeValueAsString(speed))
+                                .returns(String.class)
                                 .sinkTo(processedSink)
                                 .name("Propagate Location to Dashboard");
+        }
+
+        private static void processHeatmap(DataStream<TaxiSpeed> locationStream, KafkaSink<String> heatmapSink,
+                        ObjectMapper mapper) {
+                DataStream<HeatmapCell> heatmapStream = HeatmapPipeline.build(locationStream);
+
+                heatmapStream
+                                .map((HeatmapCell cell) -> mapper.writeValueAsString(cell))
+                                .returns(String.class)
+                                .sinkTo(heatmapSink)
+                                .name("Heatmap Distinct Taxi Count per Cell");
         }
 
         // ----------------- main function
         public static void main(String[] args) throws Exception {
                 StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
+                // set paralism, hast to be matched the partitions in kafka, otherwisekafka will
+                // slow down as only so many patritions can be written to in parallel
+                env.setParallelism(4);
                 System.out.println("Flink Taxi Job starting - connecting to Kafka...");
 
                 ObjectMapper mapper = new ObjectMapper();
@@ -136,9 +151,11 @@ public class TaxiJob {
                 // data source
                 DataStream<String> kafkaStream = createKafkaSource(env);
 
-                // reordering incomming data, filtering out invalid data, parsing the json into TaxiLocation objects
+                // reordering incomming data, filtering out invalid data, parsing the json into
+                // TaxiLocation objects
                 DataStream<TaxiLocation> locationStream = parseLocations(kafkaStream);
-                // windowing, to only get one update per taxi per 5 seconds using the latest location
+                // windowing, to only get one update per taxi per 5 seconds using the latest
+                // location
                 DataStream<TaxiLocation> filteredLocationStream = throttleLocations(locationStream);
                 SingleOutputStreamOperator<TaxiSpeed> speedStream = calculateSpeed(filteredLocationStream);
 
@@ -146,20 +163,18 @@ public class TaxiJob {
                 processOOAViolations(speedStream, violationsSink);
                 processSpeedingViolations(speedStream, speedingSink);
 
-                //TODO: I think we create the stream twice once here and once in the processOOViolations, maybe better either to use the side stream as a parameter or return the main stream
+                // TODO: I think we create the stream twice once here and once in the
+                // processOOViolations, maybe better either to use the side stream as a
+                // parameter or return the main stream
                 SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
-                        .keyBy(speed -> speed.taxi_id)
-                        .process(new OutOfAreaProcessFunction());
+                                .keyBy(speed -> speed.taxi_id)
+                                .process(new OutOfAreaProcessFunction());
 
                 propagateToDashboard(outOfAreaCheckedStream, processedSink, mapper);
 
                 processHeatmap(outOfAreaCheckedStream, heatmapSink, mapper);
-                
-
-                
 
                 env.execute("Taxi Fleet Monitoring");
         }
-
 
 }
