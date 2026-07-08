@@ -135,6 +135,7 @@ public class TaxiJob {
                 processOOAViolations(speedStream, violationsSink);
                 processSpeedingViolations(speedStream, speedingSink);
 
+                //Todo: I think we create the stream twice once here and once in the processOOViolations, maybe better either to use the side stream as a parameter or return the main stream
                 SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
                         .keyBy(speed -> speed.taxi_id)
                         .process(new OutOfAreaProcessFunction());
