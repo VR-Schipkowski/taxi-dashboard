@@ -2,6 +2,7 @@ package com.taxifleet;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taxifleet.functions.*;
+//TODO: not used
 import com.taxifleet.helper.RedisSink;
 import com.taxifleet.models.TaxiLocation;
 import com.taxifleet.models.TaxiSpeed;
@@ -135,7 +136,7 @@ public class TaxiJob {
                 processOOAViolations(speedStream, violationsSink);
                 processSpeedingViolations(speedStream, speedingSink);
 
-                //Todo: I think we create the stream twice once here and once in the processOOViolations, maybe better either to use the side stream as a parameter or return the main stream
+                //TODO: I think we create the stream twice once here and once in the processOOViolations, maybe better either to use the side stream as a parameter or return the main stream
                 SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
                         .keyBy(speed -> speed.taxi_id)
                         .process(new OutOfAreaProcessFunction());

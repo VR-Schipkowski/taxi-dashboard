@@ -43,11 +43,11 @@ function App() {
     onTaxiUpdate: (t) => {
       const isNewTaxi = !seenTaxiIdRef.current.has(String(t.taxi_id));
       if (isNewTaxi) {
-            debugLog.addEntry(
-            "taxiUpdate",
-            `NEW taxi ${t.taxi_id} appeared`,
-            // `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? " ⚡" : ""}${t.isParking ? " 🅿" : ""}`,
-            t.taxi_id,
+        debugLog.addEntry(
+          "taxiUpdate",
+          `NEW taxi ${t.taxi_id} appeared`,
+          // `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? " ⚡" : ""}${t.isParking ? " 🅿" : ""}`,
+          t.taxi_id,
         );
         seenTaxiIdRef.current.add(String(t.taxi_id));
       }
@@ -58,13 +58,13 @@ function App() {
           debugLog.addEntry(
             "speeding",
             `⚡ ${t.taxi_id} STARTED speeding at ${t.speed?.toFixed(1)} km/h`,
-            t.taxi_id
+            t.taxi_id,
           );
         } else {
           debugLog.addEntry(
             "speeding",
             `✅ ${t.taxi_id} STOPPED speeding`,
-            t.taxi_id
+            t.taxi_id,
           );
         }
       }
@@ -90,7 +90,7 @@ function App() {
       });
     },
   });
-  //ToDo: should be calculated in flink via map reduce
+  // TODO: should be calculated in flink via map reduce
   const totalDistanceAll = useMemo(
     () =>
       Object.values(taxiMap).reduce(

@@ -109,9 +109,9 @@ public class SpeedCalculatorProcessFunction
                 if (lastMovedEventTimeMillis.value() == null) {
                         lastMovedEventTimeMillis.update(0L);
                 }
-
+                //TODO: during the initialisation and warmupphase we drop data, we should add a way to get them still to the data base
                 if (previous == null) {
-                        count.update(0);
+                        count.update(1);
                         previousLocation.update(current);
                         //previousSpeedingState.update(false);
                         /*

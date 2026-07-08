@@ -19,7 +19,8 @@ KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "taxi-processed")
 KAFKA_GROUP_ID = os.environ.get("KAFKA_GROUP_ID", "taxi-api-consumer")
 
 app = FastAPI(title="Taxi Fleet API")
-
+# TODO:we only listen to processed data right now, we also need to fetch the side topics
+# TODO: this has a lot of funktions wich are not used right now maybe we could remove them
 
 @contextmanager
 def get_conn():
