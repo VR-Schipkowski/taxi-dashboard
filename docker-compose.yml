@@ -92,7 +92,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost:8081"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 10
+      start_period: 30s
 
   flink-taskmanager:
     image: flink:1.20-java11
