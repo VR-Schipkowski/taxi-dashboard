@@ -32,6 +32,7 @@ function App() {
     status,
     latency,
     latencyTrend,
+    heatmapCells,
   } = useTaxiSocket(WS_LINK, {
     onSnapshot: (data) => {
       debugLog.addEntry(
@@ -316,6 +317,8 @@ function App() {
             violatingTaxiIds={violatingTaxiIds}
             pathPositions={pathPositions}
             onSelectTaxi={selectTaxi}
+            showHeatmap={true}
+            heatmapCells={heatmapCells}
           />
         </div>
 
