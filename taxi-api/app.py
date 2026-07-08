@@ -68,8 +68,35 @@ def consume_loop() -> None:
             log.exception("Konnte Event nicht speichern: %s", message.value)
 
 
+def reset_database() -> None:
+    """Clear stored taxi data on startup.
+
+    The provider always replays the same T-Drive dataset from the beginning, so
+    without a reset each run stacks duplicate rows on top of the previous run's
+    data — including rows whose wall-clock received_at is "in the future"
+    relative to the new run, which corrupts time-ordered queries. Truncating on
+    startup gives every run a clean slate while keeping full history *within* a
+    run (path replay, history endpoints still work).
+
+    Controlled by RESET_DB_ON_STARTUP (default "true"); set to "false" to keep
+    data across restarts.
+    """
+    if os.environ.get("RESET_DB_ON_STARTUP", "true").lower() != "true":
+        log.info("RESET_DB_ON_STARTUP disabled — keeping existing taxi data")
+        return
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE taxi_speed;")
+            conn.commit()
+        log.info("Cleared taxi_speed table for a fresh run")
+    except Exception:
+        log.exception("Could not reset taxi_speed table on startup")
+
+
 @app.on_event("startup")
 def start_consumer_thread() -> None:
+    # Wipe stale data from previous runs BEFORE the consumer starts writing.
+    reset_database()
     thread = threading.Thread(target=consume_loop, daemon=True)
     thread.start()
 
