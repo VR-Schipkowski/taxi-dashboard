@@ -106,16 +106,10 @@ public class TaxiJob {
                         speedingSnapshot.sinkTo(speedingSink).name("Notify Speeding");
 
         }
-        private static void processHeatmap(DataStream<TaxiLocation> locationStream, ObjectMapper mapper) {
+        private static void processHeatmap(DataStream<TaxiSpeed> locationStream, KafkaSink<String> heatmapSink, ObjectMapper mapper) {
                 // Heatmap — distinct taxi count per cell, sliding window
                 DataStream<HeatmapCell> heatmapStream = HeatmapPipeline.build(locationStream);
-                KafkaSink<String> heatmapSink = KafkaSink.<String>builder()
-                                .setBootstrapServers(BOOTSTRAP_SERVERS)
-                                .setRecordSerializer(KafkaRecordSerializationSchema.builder()
-                                                .setTopic("taxi-heatmap")
-                                                .setValueSerializationSchema(new SimpleStringSchema())
-                                                .build())
-                                .build();
+                
                 heatmapStream.map(mapper::writeValueAsString).sinkTo(heatmapSink)
                                 .name("Heatmap Distinct Taxi Count per Cell");
 }
@@ -137,6 +131,7 @@ public class TaxiJob {
                 KafkaSink<String> violationsSink = createKafkaSink("taxi-area-violations");
                 KafkaSink<String> processedSink = createKafkaSink("taxi-processed");
                 KafkaSink<String> speedingSink = createKafkaSink("taxi-speeding");
+                KafkaSink<String> heatmapSink = createKafkaSink("taxi-heatmap");
 
                 // data source
                 DataStream<String> kafkaStream = createKafkaSource(env);
@@ -158,7 +153,7 @@ public class TaxiJob {
 
                 propagateToDashboard(outOfAreaCheckedStream, processedSink, mapper);
 
-                processHeatmap(locationStream, mapper);
+                processHeatmap(outOfAreaCheckedStream, heatmapSink, mapper);
                 
 
                 
