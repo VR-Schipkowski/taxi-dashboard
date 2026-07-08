@@ -1,9 +1,9 @@
 # Kafka Contract & Architecture Overview
 
-//TODO: UPDATE
 This file explains the architecture of the pipeline, the Kafka topic contracts,
-the WebSocket protocol, and who is responsible for what.
-Read this before starting any Stage 2 feature work.
+the WebSocket protocol, and who is responsible for what. It is the source of
+truth for how data flows between services — read it before touching any stage
+of the pipeline.
 
 ---
 
@@ -12,10 +12,16 @@ Read this before starting any Stage 2 feature work.
 ```
 Data Provider → Kafka (taxi-locations) → Flink ──→ Redis (Store Information, every event)
                                                │
-                                               ├──→ Kafka (taxi-processed, throttled 5s) ──→ Backend → WebSocket → Frontend
-                                               ├──→ Kafka (taxi-speeding, immediate)     ──→ Backend → WebSocket → Frontend
-                                               └──→ Kafka (taxi-area-violations, immediate) → Backend → WebSocket → Frontend
+                                               ├──→ Kafka (taxi-processed, throttled 5s) ──┬─→ Backend → WebSocket → Frontend
+                                               ├──→ Kafka (taxi-speeding, immediate)     ──┤
+                                               ├──→ Kafka (taxi-area-violations, immediate)┘
+                                               │
+                                               └──→ Kafka (taxi-processed) ──→ taxi-api → Postgres (history / analytics REST API)
 ```
+
+Two independent consumers read `taxi-processed`: the **backend** (live dashboard
+over WebSocket) and **taxi-api** (persists to Postgres and serves historical REST
+queries such as per-taxi path replay).
 
 **Key decisions:**
 
@@ -27,6 +33,9 @@ Data Provider → Kafka (taxi-locations) → Flink ──→ Redis (Store Inform
 | Backend does NOT write to Redis                           | Flink is the single writer — avoids race conditions                     |
 | Backend reads Redis only when a new client connects       | Snapshot so the map is not empty on first load                          |
 | Backend broadcasts single-taxi events over WebSocket      | Avoids full Redis scan on every Kafka event (OOM fix)                   |
+| taxi-api persists `taxi-processed` to Postgres            | Historical queries and per-taxi path replay for the dashboard          |
+| taxi-api truncates its table on startup                   | Provider always replays the same dataset; avoids stale/duplicate rows  |
+| Provider stamps `ingestedAt` (wall-clock) on each event   | Lets the backend measure true end-to-end pipeline latency              |
 
 ---
 
@@ -70,7 +79,8 @@ The 5s throttle means the latest event per taxi per window is forwarded — not 
   "isSpeeding": false,
   "isOutOfArea": false,
   "isParking": false,
-  "lastMoved": "2008-02-02 13:55:00"
+  "lastMoved": "2008-02-02 13:55:00",
+  "ingestedAt": 1718900000000
 }
 ```
 
@@ -79,8 +89,9 @@ Field notes:
 - `speed` — instantaneous speed for this event (km/h)
 - `averageSpeed` — rolling average speed for this taxi (km/h)
 - `totalDistance` — cumulative distance traveled (km)
-- `isSpeeding` — true if speed > 50 km/h (Mykola's threshold)
-- `isOutOfArea` — true if outside 10 km radius of Forbidden City (Muhammad's geofence)
+- `isSpeeding` — true if speed > 60 km/h (SPEEDLIMIT in SpeedCalculatorProcessFunction)
+- `isOutOfArea` — true if outside 15 km radius of the Forbidden City (GeoFence.MAX_DISTANCE_FROM_CITY_KM)
+- `ingestedAt` — wall-clock epoch-millis stamped by the provider at publish time; the backend computes end-to-end latency as `now - ingestedAt`
 - `isParking` — true if the taxi has not moved for > 300 seconds
 - `lastMoved` — timestamp of last non-parked position, empty string if never parked
 
@@ -241,6 +252,27 @@ Use `violation` for the new event. Use `areaViolations` to replace the full list
 
 ---
 
+### `latencyStats` — sent every ~5 seconds
+
+End-to-end pipeline latency, computed by the backend as `now - ingestedAt` on
+each `taxi-processed` event and aggregated over a rolling window. Values are in
+milliseconds; the frontend displays the average (and can show a trend).
+
+```json
+{
+  "type": "latencyStats",
+  "stats": {
+    "avgLatencyMs": 2100,
+    "p95LatencyMs": 3800
+  }
+}
+```
+
+`avgLatencyMs` / `p95LatencyMs` are also included in the `snapshot` message's
+`stats` block so a freshly connected client has a latency value immediately.
+
+---
+
 ## Frontend Field Guide
 
 | Field                              | Source message          | Use for                                   |
@@ -252,7 +284,7 @@ Use `violation` for the new event. Use `areaViolations` to replace the full list
 | `taxi.totalDistance`               | snapshot, taxiUpdate    | Total distance display                    |
 | `taxi.isSpeeding`                  | snapshot, taxiUpdate    | Speeding marker color                     |
 | `taxi.isParking`                   | snapshot, taxiUpdate    | Parking marker icon                       |
-| `taxi.isOutOfArea`                 | snapshot                | Area violation marker (not in taxiUpdate) |
+| `taxi.isOutOfArea`                 | snapshot, taxiUpdate    | Area violation marker (out-of-area taxis stay in the stream, flagged) |
 | `speedingIncidents[]`              | snapshot, speedingAlert | Speeding panel list                       |
 | `areaViolations[]`                 | snapshot, areaViolation | Area violation panel list                 |
 
@@ -272,6 +304,6 @@ Redis keys expire after **60 seconds**. A taxi that stops sending GPS events dis
 
 Key format: `taxi:speed:<taxi_id>` (Redis hash)
 
-Fields stored per taxi: `latitude`, `longitude`, `speed`, `averageSpeed`, `distance`, `totalDistance`, `timestamp`, `isSpeeding`, `isOutOfArea`, `isParking`, `lastMoved`
+Fields stored per taxi: `latitude`, `longitude`, `speed`, `averageSpeed`, `distance`, `totalDistance`, `timestamp`, `isSpeeding`, `isOutOfArea`, `isParking`, `lastMoved`, `ingestedAt`
 
 ---
