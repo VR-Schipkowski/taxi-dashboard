@@ -25,14 +25,10 @@ public class OutOfAreaProcessFunction
         boolean outOfArea = GeoFence.isOutOfArea(current.latitude, current.longitude);
         current.isOutOfArea = outOfArea;
 
-        if (outOfArea) {
-            LOG.warn("Taxi {} is out of area at ({}, {})",
-                    current.taxi_id, current.latitude, current.longitude);
-
-            // Side output → taxi-area-violations alert topic
+       if (outOfArea) {
+            LOG.warn("Taxi {} is out of area at ({}, {})", current.taxi_id, current.latitude, current.longitude);
             ctx.output(OutOfAreaProcess.OUT_OF_AREA_TAG, current);
-        } else {
-            out.collect(current);
         }
+        out.collect(current);
     }
 }
