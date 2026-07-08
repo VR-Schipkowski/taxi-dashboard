@@ -122,6 +122,19 @@ public class TaxiJob {
                         speedingSnapshot.sinkTo(speedingSink).name("Notify Speeding");
 
         }
+        private static void processHeatmap(DataStream<TaxiLocation> locationStream, ObjectMapper mapper) {
+                // Heatmap — distinct taxi count per cell, sliding window
+                DataStream<HeatmapCell> heatmapStream = HeatmapPipeline.build(locationStream);
+                KafkaSink<String> heatmapSink = KafkaSink.<String>builder()
+                                .setBootstrapServers(BOOTSTRAP_SERVERS)
+                                .setRecordSerializer(KafkaRecordSerializationSchema.builder()
+                                                .setTopic("taxi-heatmap")
+                                                .setValueSerializationSchema(new SimpleStringSchema())
+                                                .build())
+                                .build();
+                heatmapStream.map(mapper::writeValueAsString).sinkTo(heatmapSink)
+                                .name("Heatmap Distinct Taxi Count per Cell");
+}
 
         private static void propagateToDashboard(SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream,
                 KafkaSink<String> processedSink, ObjectMapper mapper) {
@@ -157,32 +170,13 @@ public class TaxiJob {
                 processSpeedingViolations(speedStream, speedingSink);
                 propagateToDashboard(speedStream, processedSink, mapper);
 
+                processHeatmap(locationStream, mapper);
+                
 
-                // Heatmap — distinct taxi count per cell, sliding window
-                DataStream<HeatmapCell> heatmapStream = HeatmapPipeline.build(locationStream);
-                KafkaSink<String> heatmapSink = KafkaSink.<String>builder()
-                                .setBootstrapServers(bootstrapServers)
-                                .setRecordSerializer(KafkaRecordSerializationSchema.builder()
-                                                .setTopic("taxi-heatmap")
-                                                .setValueSerializationSchema(new SimpleStringSchema())
-                                                .build())
-                                .build();
-                heatmapStream.map(mapper::writeValueAsString).sinkTo(heatmapSink)
-                                .name("Heatmap Distinct Taxi Count per Cell");
-
-
-                // Heatmap — distinct taxi count per cell, sliding window
-                DataStream<HeatmapCell> heatmapStream = HeatmapPipeline.build(locationStream);
-                KafkaSink<String> heatmapSink = KafkaSink.<String>builder()
-                                .setBootstrapServers(bootstrapServers)
-                                .setRecordSerializer(KafkaRecordSerializationSchema.builder()
-                                                .setTopic("taxi-heatmap")
-                                                .setValueSerializationSchema(new SimpleStringSchema())
-                                                .build())
-                                .build();
-                heatmapStream.map(mapper::writeValueAsString).sinkTo(heatmapSink)
-                                .name("Heatmap Distinct Taxi Count per Cell");
+                
 
                 env.execute("Taxi Fleet Monitoring");
         }
+
+
 }
