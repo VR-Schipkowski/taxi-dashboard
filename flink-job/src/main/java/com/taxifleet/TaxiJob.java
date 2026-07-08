@@ -79,29 +79,34 @@ public class TaxiJob {
                 speedStream
                                 .process(new RedisSinkFunction())
                                 .name("Store Information to Redis");
+                speedStream
+                                .process(new RedisSinkFunction())
+                                .name("Store Information to Redis");
         }
-        // TODO: currently we do not have parallelism since active alarmssweepfunction cannot handle it
+
+        // TODO: currently we do not have parallelism since active alarmssweepfunction
+        // cannot handle it
         private static DataStream<TaxiLocation> processOOAViolations(DataStream<TaxiLocation> locationStream,
-                KafkaSink<String> violationsSink) {
+                        KafkaSink<String> violationsSink) {
                 SingleOutputStreamOperator<TaxiLocation> inAreaStream = locationStream
-                        .keyBy(loc -> loc.taxi_id)
-                        .process(new OutOfAreaProcessFunction());
+                                .keyBy(loc -> loc.taxi_id)
+                                .process(new OutOfAreaProcessFunction());
 
                 DataStream<TaxiSpeed> outOfAreaStream = inAreaStream
-                        .getSideOutput(OutOfAreaProcess.OUT_OF_AREA_TAG)
-                        .map(loc -> {
-                                TaxiSpeed s = new TaxiSpeed();
-                                s.taxi_id  = loc.taxi_id ;
-                                s.timestamp = loc.timestamp;
-                                s.latitude = loc.latitude;
-                                s.longitude = loc.longitude;
-                                s.isOutOfArea = true;
-                                return s;
-                        });
+                                .getSideOutput(OutOfAreaProcess.OUT_OF_AREA_TAG)
+                                .map(loc -> {
+                                        TaxiSpeed s = new TaxiSpeed();
+                                        s.taxi_id = loc.taxi_id;
+                                        s.timestamp = loc.timestamp;
+                                        s.latitude = loc.latitude;
+                                        s.longitude = loc.longitude;
+                                        s.isOutOfArea = true;
+                                        return s;
+                                });
 
                 outOfAreaStream
-                        .process(new RedisSinkFunction())
-                        .name("Store OOA to Redis");
+                                .process(new RedisSinkFunction())
+                                .name("Store OOA to Redis");
 
                 DataStream<String> areaSnapshot = outOfAreaStream
                                 .keyBy(speed -> 0)
@@ -129,6 +134,7 @@ public class TaxiJob {
         }
 
         private static void propagateToDashboard(SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream,
+
                         KafkaSink<String> processedSink, ObjectMapper mapper) {
                 outOfAreaCheckedStream
                                 .map((TaxiSpeed speed) -> mapper.writeValueAsString(speed))
@@ -171,9 +177,9 @@ public class TaxiJob {
                 // windowing, to only get one update per taxi per 5 seconds using the latest
                 // location
                 DataStream<TaxiLocation> filteredLocationStream = throttleLocations(locationStream);
-                //now first parse in area/out of area
+                // now first parse in area/out of area
                 DataStream<TaxiLocation> inAreaStream = processOOAViolations(filteredLocationStream, violationsSink);
-                //only pass in area passed to speeding
+                // only pass in area passed to speeding
                 SingleOutputStreamOperator<TaxiSpeed> speedStream = calculateSpeed(inAreaStream);
 
                 storeToRedis(speedStream);
