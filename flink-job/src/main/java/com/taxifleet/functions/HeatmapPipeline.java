@@ -3,27 +3,28 @@ package com.taxifleet.functions;
 import com.taxifleet.models.HeatmapCell;
 import com.taxifleet.models.TaxiSpeed;
 import org.apache.flink.streaming.api.datastream.DataStream;
-import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
-import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
-import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
-import org.apache.flink.util.Collector;
+import org.apache.flink.streaming.api.windowing.assigners.SlidingProcessingTimeWindows;
 
 import java.time.Duration;
 
 public class HeatmapPipeline {
+    private static final Duration CHECK_INTERVAL = Duration.ofMinutes(1);
+    private static final Duration WINDOW_SIZE = Duration.ofMinutes(10);
+
     public static DataStream<HeatmapCell> build(DataStream<TaxiSpeed> locationStream) {
         return locationStream
+                // 1. Group by cell
                 .keyBy(location -> GridUtil.cellFor(location.latitude, location.longitude))
-                .window(TumblingProcessingTimeWindows.of(Duration.ofMinutes(1)))
+
+                // 2. Sliding window to aggregate distinct taxi counts per cell
+                .window(SlidingProcessingTimeWindows.of(WINDOW_SIZE, CHECK_INTERVAL))
+
+                // 3. Zero-fill missing data for cells that have no activity in the current
+                // window
                 .aggregate(new DistinctTaxiCountAggregator(),
-                        new ProcessWindowFunction<Integer, HeatmapCell, String, TimeWindow>() {
-                            @Override
-                            public void process(String cellId, Context ctx, Iterable<Integer> counts,
-                                    Collector<HeatmapCell> out) {
-                                out.collect(new HeatmapCell(cellId, counts.iterator().next(),
-                                        ctx.window().getStart(), ctx.window().getEnd()));
-                            }
-                        })
-                .name("Heatmap Distinct Taxi Count per Cell");
+                        new HeatmapWindowProcessor())// 3. Nachgelagertes KeyedProcess, um Lücken mit Nullen aufzufüllen
+                .keyBy(cell -> cell.cellId)
+                .process(new ZeroFillProcessFunction(CHECK_INTERVAL, WINDOW_SIZE))
+                .name("Smoothed Heatmap with Zero Fill");
     }
 }
