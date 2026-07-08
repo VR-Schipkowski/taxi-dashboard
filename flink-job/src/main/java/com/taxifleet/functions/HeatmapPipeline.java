@@ -4,18 +4,17 @@ import com.taxifleet.models.HeatmapCell;
 import com.taxifleet.models.TaxiSpeed;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
-import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
 
 import java.time.Duration;
 
 public class HeatmapPipeline {
-
     public static DataStream<HeatmapCell> build(DataStream<TaxiSpeed> locationStream) {
         return locationStream
                 .keyBy(location -> GridUtil.cellFor(location.latitude, location.longitude))
-                .window(SlidingEventTimeWindows.of(Duration.ofMinutes(10), Duration.ofMinutes(1)))
+                .window(TumblingProcessingTimeWindows.of(Duration.ofMinutes(1)))
                 .aggregate(new DistinctTaxiCountAggregator(),
                         new ProcessWindowFunction<Integer, HeatmapCell, String, TimeWindow>() {
                             @Override
