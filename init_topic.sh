@@ -1,5 +1,5 @@
 #!/bin/sh
-
+#
 /opt/kafka/bin/kafka-topics.sh --create --if-not-exists \
   --topic taxi-locations \
   --bootstrap-server kafka:9092 \
@@ -18,10 +18,10 @@
   /opt/kafka/bin/kafka-topics.sh --create --if-not-exists \
   --topic taxi-processed \
   --bootstrap-server kafka:9092 \
-  --partitions 1 --replication-factor 1
+  --partitions 4 --replication-factor 1
 
 
   /opt/kafka/bin/kafka-topics.sh --create --if-not-exists \
   --topic taxi-heatmap \
   --bootstrap-server kafka:9092 \
-  --partitions 1 --replication-factor 1
+  --partitions 4 --replication-factor 1
