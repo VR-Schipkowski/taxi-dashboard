@@ -2,7 +2,6 @@ package com.taxifleet;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taxifleet.functions.*;
-//TODO: not used
 import com.taxifleet.helper.RedisSink;
 import com.taxifleet.models.TaxiLocation;
 import com.taxifleet.models.TaxiSpeed;
@@ -77,19 +76,36 @@ public class TaxiJob {
                         .name("Store Information to Redis");
         }
         // TODO: currently we do not have parallelism since active alarmssweepfunction cannot handle it
-        private static void processOOAViolations(SingleOutputStreamOperator<TaxiSpeed> speedStream,
+        private static DataStream<TaxiLocation> processOOAViolations(DataStream<TaxiLocation> locationStream,
                 KafkaSink<String> violationsSink) {
-                SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
-                        .keyBy(speed -> speed.taxi_id)
+                SingleOutputStreamOperator<TaxiLocation> inAreaStream = locationStream
+                        .keyBy(loc -> loc.taxi_id)
                         .process(new OutOfAreaProcessFunction());
-                DataStream<TaxiSpeed> outOfAreaStream = outOfAreaCheckedStream
-                        .getSideOutput(OutOfAreaProcess.OUT_OF_AREA_TAG);
+
+                DataStream<TaxiSpeed> outOfAreaStream = inAreaStream
+                        .getSideOutput(OutOfAreaProcess.OUT_OF_AREA_TAG)
+                        .map(loc -> {
+                                TaxiSpeed s = new TaxiSpeed();
+                                s.taxi_id  = loc.taxi_id ;
+                                s.timestamp = loc.timestamp;
+                                s.latitude = loc.latitude;
+                                s.longitude = loc.longitude;
+                                s.isOutOfArea = true;
+                                return s;
+                        });
+
+                outOfAreaStream
+                        .process(new RedisSinkFunction())
+                        .name("Store OOA to Redis");
+
                 DataStream<String> areaSnapshot = outOfAreaStream
                         .keyBy(speed -> 0)
                         .process(new ActiveAlarmsSweepFunction())
                         .setParallelism(1)
                         .name("Area Active Alarms Snapshot");
                 areaSnapshot.sinkTo(violationsSink).name("Notify Area Violation");
+
+                return inAreaStream;
         }
         // TODO: currently we do not have parallelism since active alarmssweepfunction cannot handle it
         private static void processSpeedingViolations(SingleOutputStreamOperator<TaxiSpeed> speedStream,
@@ -130,18 +146,14 @@ public class TaxiJob {
                 DataStream<TaxiLocation> locationStream = parseLocations(kafkaStream);
                 // windowing, to only get one update per taxi per 5 seconds using the latest location
                 DataStream<TaxiLocation> filteredLocationStream = throttleLocations(locationStream);
-                SingleOutputStreamOperator<TaxiSpeed> speedStream = calculateSpeed(filteredLocationStream);
+                //now first parse in area/out of area
+                DataStream<TaxiLocation> inAreaStream = processOOAViolations(filteredLocationStream, violationsSink);
+                //only pass in area passed to speeding
+                SingleOutputStreamOperator<TaxiSpeed> speedStream = calculateSpeed(inAreaStream);
 
                 storeToRedis(speedStream);
-                processOOAViolations(speedStream, violationsSink);
                 processSpeedingViolations(speedStream, speedingSink);
-
-                //TODO: I think we create the stream twice once here and once in the processOOViolations, maybe better either to use the side stream as a parameter or return the main stream
-                SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream = speedStream
-                        .keyBy(speed -> speed.taxi_id)
-                        .process(new OutOfAreaProcessFunction());
-
-                propagateToDashboard(outOfAreaCheckedStream, processedSink, mapper);
+                propagateToDashboard(speedStream, processedSink, mapper);
 
                 env.execute("Taxi Fleet Monitoring");
         }
