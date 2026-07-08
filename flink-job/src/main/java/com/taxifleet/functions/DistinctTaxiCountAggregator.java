@@ -1,13 +1,13 @@
 package com.taxifleet.functions;
 
-import com.taxifleet.models.TaxiLocation;
+import com.taxifleet.models.TaxiSpeed;
 import org.apache.flink.api.common.functions.AggregateFunction;
 
 import java.util.HashSet;
 import java.util.Set;
 
 public class DistinctTaxiCountAggregator
-        implements AggregateFunction<TaxiLocation, Set<Integer>, Integer> {
+        implements AggregateFunction<TaxiSpeed, Set<Integer>, Integer> {
 
     @Override
     public Set<Integer> createAccumulator() {
@@ -15,7 +15,7 @@ public class DistinctTaxiCountAggregator
     }
 
     @Override
-    public Set<Integer> add(TaxiLocation location, Set<Integer> accumulator) {
+    public Set<Integer> add(TaxiSpeed location, Set<Integer> accumulator) {
         accumulator.add(location.taxi_id);
         return accumulator;
     }

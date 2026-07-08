@@ -1,7 +1,7 @@
 package com.taxifleet.functions;
 
 import com.taxifleet.models.HeatmapCell;
-import com.taxifleet.models.TaxiLocation;
+import com.taxifleet.models.TaxiSpeed;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.functions.windowing.ProcessWindowFunction;
 import org.apache.flink.streaming.api.windowing.assigners.SlidingEventTimeWindows;
@@ -12,7 +12,7 @@ import java.time.Duration;
 
 public class HeatmapPipeline {
 
-    public static DataStream<HeatmapCell> build(DataStream<TaxiLocation> locationStream) {
+    public static DataStream<HeatmapCell> build(DataStream<TaxiSpeed> locationStream) {
         return locationStream
                 .keyBy(location -> GridUtil.cellFor(location.latitude, location.longitude))
                 .window(SlidingEventTimeWindows.of(Duration.ofMinutes(10), Duration.ofMinutes(1)))
