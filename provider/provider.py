@@ -5,7 +5,7 @@ Instead of loading all records into RAM, we open every .txt file as a
 lazy iterator and merge them on-the-fly with a min-heap (heapq.merge).
 Memory usage stays O(number_of_files) regardless of total data size.
 
-Data format per line:  taxiId,timestamp,longitude,latitude
+Data format per line:  taxi_id,timestamp,longitude,latitude
 Example:               1,2008-02-02 15:36:08,116.51172,39.92123
 """
 
@@ -42,7 +42,7 @@ TIMESTAMP_FMT = "%Y-%m-%d %H:%M:%S"
 
 def _file_records(path: str):
     """
-    Generator: yields (datetime, taxiId, longitude, latitude) tuples from
+    Generator: yields (datetime, taxi_id, longitude, latitude) tuples from
     one taxi file, in the order they appear in the file.
     The file is assumed to be sorted by timestamp already (T-Drive files are).
     If a line is malformed it is skipped with a warning.
@@ -73,7 +73,7 @@ def merged_stream(data_dir: str):
     Opens all .txt files and merges their record streams by timestamp using
     a min-heap.  Peak RAM = one record per open file.
 
-    Yields (datetime, taxiId, longitude, latitude) in ascending timestamp order.
+    Yields (datetime, taxi_id, longitude, latitude) in ascending timestamp order.
     """
     txt_files = sorted(
         os.path.join(data_dir, f)
@@ -146,7 +146,7 @@ def replay(
     wall_start: float | None = None
     data_start: datetime | None = None
     total_sent = 0
-    last_seen: dict[int, datetime] = {}   # taxiId -> last timestamp seen
+    last_seen: dict[int, datetime] = {}   # taxi_id -> last timestamp seen
 
     try:
         for batch_dt, batch_iter in groupby(stream, key=lambda r: r[0]):
@@ -183,7 +183,7 @@ def replay(
         # Send END token for every taxi we saw
         for taxi_id in last_seen:
             _send(producer, topic, taxi_id, {
-                "taxiId": taxi_id,
+                "taxi_id": taxi_id,
                 "type":   END_TOKEN,
             })
         producer.flush()

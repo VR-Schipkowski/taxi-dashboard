@@ -20,8 +20,8 @@ public class ActiveAlarmsSweepFunction
     private static final long TTL_MS = 5 * 60 * 1000L;
     private static final long SWEEP_INTERVAL_MS = 30_000L;
 
-    private transient MapState<Integer, TaxiSpeed> activeAlarms; // taxiId -> latest event
-    private transient MapState<Integer, Long> lastSeen;          // taxiId -> last update time
+    private transient MapState<Integer, TaxiSpeed> activeAlarms; // taxi_id -> latest event
+    private transient MapState<Integer, Long> lastSeen; // taxi_id -> last update time
     private transient ValueState<Boolean> sweepScheduled;
     private transient ObjectMapper mapper;
 
@@ -38,10 +38,10 @@ public class ActiveAlarmsSweepFunction
 
     @Override
     public void processElement(TaxiSpeed event, Context ctx, Collector<String> out) throws Exception {
-        boolean isNewAlarm = !activeAlarms.contains(event.taxiId);
+        boolean isNewAlarm = !activeAlarms.contains(event.taxi_id);
 
-        activeAlarms.put(event.taxiId, event);
-        lastSeen.put(event.taxiId, ctx.timerService().currentProcessingTime());
+        activeAlarms.put(event.taxi_id, event);
+        lastSeen.put(event.taxi_id, ctx.timerService().currentProcessingTime());
 
         if (isNewAlarm) {
             emitSnapshot(out); // only emit when membership actually changes
@@ -60,13 +60,15 @@ public class ActiveAlarmsSweepFunction
         List<Integer> stale = new ArrayList<>();
 
         for (Map.Entry<Integer, Long> e : lastSeen.entries()) {
-            if (now - e.getValue() >= TTL_MS) stale.add(e.getKey());
+            if (now - e.getValue() >= TTL_MS)
+                stale.add(e.getKey());
         }
-        for (Integer taxiId : stale) {
-            activeAlarms.remove(taxiId);
-            lastSeen.remove(taxiId);
+        for (Integer taxi_id : stale) {
+            activeAlarms.remove(taxi_id);
+            lastSeen.remove(taxi_id);
         }
-        if (!stale.isEmpty()) emitSnapshot(out);
+        if (!stale.isEmpty())
+            emitSnapshot(out);
 
         boolean stillActive = lastSeen.keys().iterator().hasNext();
         if (stillActive) {
@@ -78,7 +80,8 @@ public class ActiveAlarmsSweepFunction
 
     private void emitSnapshot(Collector<String> out) throws Exception {
         List<TaxiSpeed> snapshot = new ArrayList<>();
-        for (TaxiSpeed t : activeAlarms.values()) snapshot.add(t);
+        for (TaxiSpeed t : activeAlarms.values())
+            snapshot.add(t);
         out.collect(mapper.writeValueAsString(snapshot));
     }
 }

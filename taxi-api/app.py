@@ -19,7 +19,8 @@ KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "taxi-processed")
 KAFKA_GROUP_ID = os.environ.get("KAFKA_GROUP_ID", "taxi-api-consumer")
 
 app = FastAPI(title="Taxi Fleet API")
-
+# TODO:we only listen to processed data right now, we also need to fetch the side topics
+# TODO: this has a lot of funktions wich are not used right now maybe we could remove them
 
 @contextmanager
 def get_conn():
@@ -36,9 +37,9 @@ INSERT INTO taxi_speed (
     average_speed, total_distance, is_speeding, is_out_of_area,
     last_moved, is_parking, ingested_at
 ) VALUES (
-    %(taxiId)s, %(timestamp)s, %(longitude)s, %(latitude)s, %(speed)s,
+    %(taxi_id)s, %(timestamp)s, %(longitude)s, %(latitude)s, %(speed)s,
     %(averageSpeed)s, %(totalDistance)s, %(isSpeeding)s, %(isOutOfArea)s,
-    %(lastMoved)s, %(isParking)s, %(ingestedAt)s
+    %(lastMoved)s, %(isParking)s, %(ingested_at)s
 )
 """
 
@@ -67,8 +68,35 @@ def consume_loop() -> None:
             log.exception("Konnte Event nicht speichern: %s", message.value)
 
 
+def reset_database() -> None:
+    """Clear stored taxi data on startup.
+
+    The provider always replays the same T-Drive dataset from the beginning, so
+    without a reset each run stacks duplicate rows on top of the previous run's
+    data — including rows whose wall-clock received_at is "in the future"
+    relative to the new run, which corrupts time-ordered queries. Truncating on
+    startup gives every run a clean slate while keeping full history *within* a
+    run (path replay, history endpoints still work).
+
+    Controlled by RESET_DB_ON_STARTUP (default "true"); set to "false" to keep
+    data across restarts.
+    """
+    if os.environ.get("RESET_DB_ON_STARTUP", "true").lower() != "true":
+        log.info("RESET_DB_ON_STARTUP disabled — keeping existing taxi data")
+        return
+    try:
+        with get_conn() as conn, conn.cursor() as cur:
+            cur.execute("TRUNCATE TABLE taxi_speed;")
+            conn.commit()
+        log.info("Cleared taxi_speed table for a fresh run")
+    except Exception:
+        log.exception("Could not reset taxi_speed table on startup")
+
+
 @app.on_event("startup")
 def start_consumer_thread() -> None:
+    # Wipe stale data from previous runs BEFORE the consumer starts writing.
+    reset_database()
     thread = threading.Thread(target=consume_loop, daemon=True)
     thread.start()
 
@@ -226,7 +254,7 @@ def list_out_of_area():
 @app.get("/stats/latency")
 def latency_stats():
     """Durchschnittliche/max. End-to-End Pipeline-Latenz der letzten 5 Minuten,
-    basierend auf dem ingestedAt-Feld aus TaxiSpeed."""
+    basierend auf dem ingested_at-Feld aus TaxiSpeed."""
     sql = """
         SELECT
             AVG(EXTRACT(EPOCH FROM received_at) * 1000 - ingested_at) AS avg_latency_ms,
