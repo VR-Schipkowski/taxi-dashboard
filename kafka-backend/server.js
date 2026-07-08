@@ -204,6 +204,18 @@ async function startConsumers() {
       broadcast({ type: "areaViolation", areaViolations });
     },
   });
+  const cellConsumer = kafka.consumer({ groupId: "backend-cell" });
+  await cellConsumer.connect();
+  await cellConsumer.subscribe({
+    topic: "taxi-heatmap",
+    fromBeginning: false,
+  });
+  await cellConsumer.run({
+    eachMessage: async ({ message }) => {
+      const cellData = JSON.parse(message.value.toString());
+      broadcast({ type: "heatmapUpdate", cellData });
+    },
+  });
 }
 
 startConsumers().catch(console.error);
