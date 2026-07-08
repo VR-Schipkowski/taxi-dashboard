@@ -18,6 +18,8 @@ import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.windowing.assigners.TumblingProcessingTimeWindows;
 
+import com.taxifleet.models.HeatmapCell;
+
 public class TaxiJob {
         private static String bootstrapServers = "kafka:9092";
 
@@ -142,6 +144,19 @@ public class TaxiJob {
                                 .process(new ActiveAlarmsSweepFunction())
                                 .name("Speeding Active Alarms Snapshot");
                 speedingSnapshot.sinkTo(speedingSink).name("Notify Speeding");
+
+
+                // Heatmap — distinct taxi count per cell, sliding window
+                DataStream<HeatmapCell> heatmapStream = HeatmapPipeline.build(locationStream);
+                KafkaSink<String> heatmapSink = KafkaSink.<String>builder()
+                                .setBootstrapServers(bootstrapServers)
+                                .setRecordSerializer(KafkaRecordSerializationSchema.builder()
+                                                .setTopic("taxi-heatmap")
+                                                .setValueSerializationSchema(new SimpleStringSchema())
+                                                .build())
+                                .build();
+                heatmapStream.map(mapper::writeValueAsString).sinkTo(heatmapSink)
+                                .name("Heatmap Distinct Taxi Count per Cell");
 
                 env.execute("Taxi Fleet Monitoring");
         }
