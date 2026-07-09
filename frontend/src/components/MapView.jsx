@@ -10,6 +10,7 @@ import {
 import MarkerClusterGroup from "react-leaflet-cluster";
 
 import { pickTaxiIcon, createClusterIcon } from "../utils/taxiIcons.js";
+import { HeatMapLayer } from "./HeatMapLayer.jsx";
 
 const BEIJING_CENTER = [39.9042, 116.4074];
 const DEFAULT_ZOOM = 12;
@@ -34,6 +35,7 @@ function RecenterMap({ selectedTaxi }) {
 
 // Renders the full live map: base tiles, clustered taxi markers, the
 // selected taxi's recent path, and auto-recentering on selection.
+//TODO: adding is parking if taxi is cliced
 export function MapView({
   taxiMap,
   taxis,
@@ -41,6 +43,8 @@ export function MapView({
   violatingTaxiIds,
   pathPositions,
   onSelectTaxi,
+  showHeatmap,
+  heatmapCells,
 }) {
   return (
     <MapContainer
@@ -55,12 +59,13 @@ export function MapView({
         attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      {showHeatmap && <HeatMapLayer cells={heatmapCells} />}
       <MarkerClusterGroup
         chunkedLoading
         iconCreateFunction={createClusterIcon}
         maxClusterRadius={60}
         spiderfyOnMaxZoom={true}
-        disableClusteringAtZoom={16}
+        disableClusteringAtZoom={20}
         showCoverageOnHover={false}
       >
         {selectedTaxiId !== null && pathPositions.length > 1 && (

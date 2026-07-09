@@ -36,6 +36,7 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
   const [latency, setLatency] = useState(null);
   const [latencyHistory, setLatencyHistory] = useState([]);
   const [latencyTrend, setLatencyTrend] = useState(null);
+  const [heatmapCells, setHeatmapCells] = useState({});
 
   // TODO: this batching path is currently dead code — nothing ever writes
   // into pendingUpdates.current, so the flush interval below never has
@@ -122,6 +123,9 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
           const violations = data.areaViolations || [];
           setAreaViolations(violations);
           cb.onAreaViolation?.(violations);
+        } else if (data.type === "heatmapUpdate") {
+          const cell = data.cellData;
+          setHeatmapCells((prev) => ({ ...prev, [cell.cellId]: cell }));
         }
       } catch (error) {
         console.error("Error parsing WebSocket data:", error);
@@ -141,5 +145,6 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
     status,
     latency,
     latencyTrend,
+    heatmapCells,
   };
 }
