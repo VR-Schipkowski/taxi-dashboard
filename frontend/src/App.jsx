@@ -81,14 +81,11 @@ function App() {
     //     );
     //   });
     // },
-    onAreaViolation: (violations) => {
-      violations.forEach((v) => {
-        debugLog.addEntry(
-          "area",
-          `taxi ${v.taxi_id} outside permitted area`,
-          v.taxi_id,
-        );
-      });
+    onAreaViolation: () => {
+    },
+    onOoaNotification: ({ trigger, taxiId }) => {
+      const label = trigger === 'entered' ? '🚨 left area' : '✅ returned';
+      debugLog.addEntry('area', `taxi ${taxiId} — ${label}`, taxiId);
     },
   });
   // TODO: should be calculated in flink via map reduce

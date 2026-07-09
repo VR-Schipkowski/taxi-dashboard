@@ -14,16 +14,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class ActiveAlarmsSweepFunction
+public abstract class BaseAlarmsSweepFunction
         extends KeyedProcessFunction<Integer, TaxiSpeed, String> {
 
     private static final long TTL_MS = 5 * 60 * 1000L;
     private static final long SWEEP_INTERVAL_MS = 30_000L;
 
-    private transient MapState<Integer, TaxiSpeed> activeAlarms; // taxi_id -> latest event
-    private transient MapState<Integer, Long> lastSeen; // taxi_id -> last update time
+    protected transient MapState<Integer, TaxiSpeed> activeAlarms;
+    protected transient MapState<Integer, Long> lastSeen;
     private transient ValueState<Boolean> sweepScheduled;
-    private transient ObjectMapper mapper;
+    protected transient ObjectMapper mapper;
 
     @Override
     public void open(Configuration parameters) {
@@ -36,16 +36,11 @@ public class ActiveAlarmsSweepFunction
         mapper = new ObjectMapper();
     }
 
-    @Override
-    public void processElement(TaxiSpeed event, Context ctx, Collector<String> out) throws Exception {
-        boolean isNewAlarm = !activeAlarms.contains(event.taxi_id);
-
+    protected void addAlarm(TaxiSpeed event, Context ctx, Collector<String> out) throws Exception {
+        boolean isNew = !activeAlarms.contains(event.taxi_id);
         activeAlarms.put(event.taxi_id, event);
         lastSeen.put(event.taxi_id, ctx.timerService().currentProcessingTime());
-
-        if (isNewAlarm) {
-            emitSnapshot(out); // only emit when membership actually changes
-        }
+        if (isNew) emitSnapshot(out);
 
         if (sweepScheduled.value() == null) {
             sweepScheduled.update(true);
@@ -54,21 +49,26 @@ public class ActiveAlarmsSweepFunction
         }
     }
 
+    protected void removeAlarm(int taxi_id, Collector<String> out) throws Exception {
+        if (activeAlarms.contains(taxi_id)) {
+            activeAlarms.remove(taxi_id);
+            lastSeen.remove(taxi_id);
+            emitSnapshot(out);
+        }
+    }
+
     @Override
     public void onTimer(long timestamp, OnTimerContext ctx, Collector<String> out) throws Exception {
         long now = ctx.timerService().currentProcessingTime();
         List<Integer> stale = new ArrayList<>();
-
         for (Map.Entry<Integer, Long> e : lastSeen.entries()) {
-            if (now - e.getValue() >= TTL_MS)
-                stale.add(e.getKey());
+            if (now - e.getValue() >= TTL_MS) stale.add(e.getKey());
         }
         for (Integer taxi_id : stale) {
             activeAlarms.remove(taxi_id);
             lastSeen.remove(taxi_id);
         }
-        if (!stale.isEmpty())
-            emitSnapshot(out);
+        if (!stale.isEmpty()) emitSnapshot(out);
 
         boolean stillActive = lastSeen.keys().iterator().hasNext();
         if (stillActive) {
@@ -78,10 +78,9 @@ public class ActiveAlarmsSweepFunction
         }
     }
 
-    private void emitSnapshot(Collector<String> out) throws Exception {
+    protected void emitSnapshot(Collector<String> out) throws Exception {
         List<TaxiSpeed> snapshot = new ArrayList<>();
-        for (TaxiSpeed t : activeAlarms.values())
-            snapshot.add(t);
+        for (TaxiSpeed t : activeAlarms.values()) snapshot.add(t);
         out.collect(mapper.writeValueAsString(snapshot));
     }
 }

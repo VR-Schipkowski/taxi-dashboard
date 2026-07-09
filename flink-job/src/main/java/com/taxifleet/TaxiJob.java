@@ -2,7 +2,6 @@ package com.taxifleet;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taxifleet.functions.*;
-import com.taxifleet.helper.RedisSink;
 import com.taxifleet.models.TaxiLocation;
 import com.taxifleet.models.TaxiSpeed;
 
@@ -44,31 +43,28 @@ public class TaxiJob {
                                 .setValueOnlyDeserializer(new SimpleStringSchema())
                                 .build();
                 return env.fromSource(
-                                source,
+                        source,
                                 WatermarkStrategy.noWatermarks(),
                                 "Kafka Taxi Source");
         }
 
         private static DataStream<TaxiLocation> parseLocations(DataStream<String> rawStream) {
                 return rawStream
-                                .flatMap(new LocationParser())
-                                .name("Parse JSON and Filter Invalid Locations")
-                                .assignTimestampsAndWatermarks(
-                                                WatermarkStrategy
-                                                                .<TaxiLocation>forBoundedOutOfOrderness(WATERMARK_BOUND)
-                                                                .withTimestampAssigner((loc,
-                                                                                recordTimestamp) -> loc.eventTimeMillis));
+                        .flatMap(new LocationParser())
+                        .name("Parse JSON and Filter Invalid Locations")
+                        .assignTimestampsAndWatermarks(
+                                        WatermarkStrategy.<TaxiLocation>forBoundedOutOfOrderness(WATERMARK_BOUND)
+                                                .withTimestampAssigner((loc,recordTimestamp) -> loc.eventTimeMillis));                            
         }
 
         private static DataStream<TaxiLocation> throttleLocations(DataStream<TaxiLocation> locations) {
                 return locations
-                                .keyBy(location -> location.taxi_id)
-                                .window(TumblingProcessingTimeWindows.of(WINDOW_DURATION))
-                                .maxBy("timestamp");
+                        .keyBy(location -> location.taxi_id)
+                        .window(TumblingProcessingTimeWindows.of(WINDOW_DURATION))
+                        .maxBy("timestamp");
         }
 
-        private static SingleOutputStreamOperator<TaxiSpeed> calculateSpeed(
-                        DataStream<TaxiLocation> filteredLocationStream) {
+        private static SingleOutputStreamOperator<TaxiSpeed> calculateSpeed(DataStream<TaxiLocation> filteredLocationStream) {
                 return filteredLocationStream
                                 .keyBy(location -> location.taxi_id)
                                 .process(new SpeedCalculatorProcessFunction())
@@ -76,18 +72,15 @@ public class TaxiJob {
         }
 
         private static void storeToRedis(SingleOutputStreamOperator<TaxiSpeed> speedStream) {
-                speedStream
-                                .process(new RedisSinkFunction())
-                                .name("Store Information to Redis");
-                speedStream
-                                .process(new RedisSinkFunction())
-                                .name("Store Information to Redis");
+               speedStream
+                        .process(new RedisSinkFunction())
+                        .name("Store Information to Redis");
         }
 
         // TODO: currently we do not have parallelism since active alarmssweepfunction
         // cannot handle it
         private static DataStream<TaxiLocation> processOOAViolations(DataStream<TaxiLocation> locationStream,
-                        KafkaSink<String> violationsSink) {
+                        KafkaSink<String> violationsSink, ObjectMapper mapper) {
                 SingleOutputStreamOperator<TaxiLocation> inAreaStream = locationStream
                                 .keyBy(loc -> loc.taxi_id)
                                 .process(new OutOfAreaProcessFunction());
@@ -104,13 +97,26 @@ public class TaxiJob {
                                         return s;
                                 });
 
+                DataStream<TaxiSpeed> ooaReturnedStream = inAreaStream
+                        .getSideOutput(OutOfAreaProcess.OOA_RETURNED_TAG)
+                        .map(loc -> {
+                                TaxiSpeed s = new TaxiSpeed();
+                                s.taxi_id = loc.taxi_id;
+                                s.timestamp = loc.timestamp;
+                                s.latitude = loc.latitude;
+                                s.longitude = loc.longitude;
+                                s.isOutOfArea = false;
+                                return s;
+                        });
+
                 outOfAreaStream
                                 .process(new RedisSinkFunction())
                                 .name("Store OOA to Redis");
 
                 DataStream<String> areaSnapshot = outOfAreaStream
-                                .keyBy(speed -> 0)
-                                .process(new ActiveAlarmsSweepFunction())
+                                .union(ooaReturnedStream)
+                        .keyBy(speed -> 0)
+                                .process(new OOAAlarmsSweepFunction())
                                 .setParallelism(1)
                                 .name("Area Active Alarms Snapshot");
                 areaSnapshot.sinkTo(violationsSink).name("Notify Area Violation");
@@ -126,11 +132,10 @@ public class TaxiJob {
                                 .getSideOutput(SpeedCalculatorProcess.SPEEDING_TAG);
                 DataStream<String> speedingSnapshot = speedingStream
                                 .keyBy(speed -> 0)
-                                .process(new ActiveAlarmsSweepFunction())
+                                .process(new SpeedingAlarmsSweepFunction())
                                 .setParallelism(1)
                                 .name("Speeding Active Alarms Snapshot");
                 speedingSnapshot.sinkTo(speedingSink).name("Notify Speeding");
-
         }
 
         private static void propagateToDashboard(SingleOutputStreamOperator<TaxiSpeed> outOfAreaCheckedStream,
@@ -178,7 +183,7 @@ public class TaxiJob {
                 // location
                 DataStream<TaxiLocation> filteredLocationStream = throttleLocations(locationStream);
                 // now first parse in area/out of area
-                DataStream<TaxiLocation> inAreaStream = processOOAViolations(filteredLocationStream, violationsSink);
+                DataStream<TaxiLocation> inAreaStream = processOOAViolations(filteredLocationStream, violationsSink, mapper);
                 // only pass in area passed to speeding
                 SingleOutputStreamOperator<TaxiSpeed> speedStream = calculateSpeed(inAreaStream);
 

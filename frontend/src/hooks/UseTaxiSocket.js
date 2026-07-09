@@ -127,6 +127,10 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
           const cell = data.cellData;
           setHeatmapCells((prev) => ({ ...prev, [cell.cellId]: cell }));
         }
+        else if (data.type === "ooaNotification") {
+          cb.onOoaNotification?.(data);
+        }
+
       } catch (error) {
         console.error("Error parsing WebSocket data:", error);
       }

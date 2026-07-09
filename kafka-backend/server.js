@@ -18,6 +18,7 @@ const kafka = new Kafka({ brokers: ["kafka:9092"] });
 
 let speedingIncidents = [];
 let areaViolations = [];
+const areaViolationIndex = new Set();
 // taxi_Id -> violation
 
 // Rolling window of recent end-to-end latencies (ms) for the dashboard health panel.
@@ -198,11 +199,29 @@ async function startConsumers() {
     topic: "taxi-area-violations",
     fromBeginning: false,
   });
-  await violationsConsumer.run({
+  violationsConsumer.run({
     eachMessage: async ({ message }) => {
-      areaViolations = JSON.parse(message.value.toString());
-      broadcast({ type: "areaViolation", areaViolations });
-    },
+      const newList = JSON.parse(message.value.toString());
+      const newIds = new Set(newList.map(v => String(v.taxi_id)));
+
+      // detect transitions by diffing
+      for (const id of newIds) {
+        if (!areaViolationIndex.has(id)) {
+          broadcast({ type: 'ooaNotification', trigger: 'entered', taxiId: id });
+        }
+      }
+      for (const id of areaViolationIndex) {
+        if (!newIds.has(id)) {
+          broadcast({ type: 'ooaNotification', trigger: 'returned', taxiId: id });
+        }
+      }
+
+      areaViolations = newList;
+      areaViolationIndex.clear();
+      newIds.forEach(id => areaViolationIndex.add(id));
+
+      broadcast({ type: 'areaViolation', areaViolations });
+    }
   });
   const cellConsumer = kafka.consumer({ groupId: "backend-cell" });
   await cellConsumer.connect();
