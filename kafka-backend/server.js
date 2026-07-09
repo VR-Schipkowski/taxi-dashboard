@@ -98,6 +98,7 @@ function broadcast(payload) {
 }
 
 // Read full state from Redis — only called when a new client connects
+//TODO: add a redis for taxi-heatmap and taxi-area-violations so we can send a snapshot of those too also figure out better parameter for the heatmap component ocpancy also make it togabl.
 async function buildSnapshot() {
   const keys = await redis.keys("taxi:speed:*");
   const taxis = [];
