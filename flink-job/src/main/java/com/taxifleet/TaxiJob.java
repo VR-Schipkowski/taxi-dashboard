@@ -149,7 +149,7 @@ public class TaxiJob {
 
                         KafkaSink<String> processedSink, ObjectMapper mapper) {
                 outOfAreaCheckedStream
-                                .map((TaxiSpeed speed) -> mapper.writeValueAsString(speed))
+                                .map(mapper::writeValueAsString)
                                 .returns(String.class)
                                 .sinkTo(processedSink)
                                 .name("Propagate Location to Dashboard");
@@ -160,7 +160,7 @@ public class TaxiJob {
                 DataStream<HeatmapCell> heatmapStream = HeatmapPipeline.build(locationStream);
 
                 heatmapStream
-                                .map((HeatmapCell cell) -> mapper.writeValueAsString(cell))
+                                .map(mapper::writeValueAsString)
                                 .returns(String.class)
                                 .sinkTo(heatmapSink)
                                 .name("Heatmap Distinct Taxi Count per Cell");
@@ -193,6 +193,11 @@ public class TaxiJob {
                 DataStream<TaxiLocation> inAreaStream = processOOAViolations(filteredLocationStream, violationsSink, mapper);
                 // only pass in area passed to speeding
                 SingleOutputStreamOperator<TaxiSpeed> speedStream = calculateSpeed(inAreaStream);
+
+                speedStream.keyBy(speed -> 0)
+                        .process(new TotalDistanceFunction())
+                        .setParallelism(1)
+                        .name("Total Distance Function");
 
                 storeToRedis(speedStream);
                 processSpeedingViolations(speedStream, speedingSink);
