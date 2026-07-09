@@ -1,6 +1,5 @@
-package com.taxifleet.functions;
+package com.taxifleet.functions.alarms;
 
-import com.taxifleet.functions.BaseAlarmsSweepFunction;
 import com.taxifleet.models.TaxiSpeed;
 import org.apache.flink.util.Collector;
 

@@ -1,4 +1,4 @@
-package com.taxifleet.functions;
+package com.taxifleet.functions.speed;
 
 import com.taxifleet.helper.Helper;
 import com.taxifleet.models.TaxiLocation;

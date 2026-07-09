@@ -2,6 +2,13 @@ package com.taxifleet;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taxifleet.functions.*;
+import com.taxifleet.functions.alarms.OOAAlarmsSweepFunction;
+import com.taxifleet.functions.alarms.SpeedingAlarmsSweepFunction;
+import com.taxifleet.functions.heatmap.HeatmapPipeline;
+import com.taxifleet.functions.ooa.OutOfAreaProcess;
+import com.taxifleet.functions.ooa.OutOfAreaProcessFunction;
+import com.taxifleet.functions.speed.SpeedCalculatorProcess;
+import com.taxifleet.functions.speed.SpeedCalculatorProcessFunction;
 import com.taxifleet.models.TaxiLocation;
 import com.taxifleet.models.TaxiSpeed;
 

@@ -1,4 +1,4 @@
-package com.taxifleet.functions;
+package com.taxifleet.functions.heatmap;
 
 import com.taxifleet.models.HeatmapCell;
 import org.apache.flink.api.common.state.ValueState;

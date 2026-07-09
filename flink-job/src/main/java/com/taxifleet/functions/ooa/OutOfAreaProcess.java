@@ -1,4 +1,4 @@
-package com.taxifleet.functions;
+package com.taxifleet.functions.ooa;
 
 import com.taxifleet.models.TaxiLocation;
 import org.apache.flink.util.OutputTag;

@@ -1,4 +1,4 @@
-package com.taxifleet.functions;
+package com.taxifleet.functions.alarms;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.taxifleet.models.TaxiSpeed;

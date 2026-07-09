@@ -1,4 +1,4 @@
-package com.taxifleet.functions;
+package com.taxifleet.functions.heatmap;
 
 public class GridUtil {
     // Cell size in degrees. ~0.01° latitude ≈ 1.1 km — tune to your area's scale.

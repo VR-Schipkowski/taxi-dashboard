@@ -1,4 +1,4 @@
-package com.taxifleet.functions;
+package com.taxifleet.functions.heatmap;
 
 import com.taxifleet.models.HeatmapCell;
 import com.taxifleet.models.TaxiSpeed;
