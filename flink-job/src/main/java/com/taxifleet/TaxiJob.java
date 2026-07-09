@@ -184,7 +184,7 @@ public class TaxiJob {
                 DataStream<TaxiLocation> filteredLocationStream = throttleLocations(locationStream);
                 // now first parse in area/out of area
                 DataStream<TaxiLocation> inAreaStream = processOOAViolations(filteredLocationStream, violationsSink, mapper);
-                // only pass in area taxis to speed
+                // only pass in area passed to speeding
                 SingleOutputStreamOperator<TaxiSpeed> speedStream = calculateSpeed(inAreaStream);
 
                 storeToRedis(speedStream);
