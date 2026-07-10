@@ -105,12 +105,16 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
             const newHistory = [...prev, newLatency].slice(-5);
             if (newHistory.length >= 2) {
               const previous = newHistory[newHistory.length - 2];
+              const delta = newLatency - previous;
+              const DELTA_THRESHOLD = 0.01;
               setLatencyTrend(
-                newLatency > previous
-                  ? "up"
-                  : newLatency < previous
-                    ? "down"
-                    : null,
+                Math.abs(delta) < DELTA_THRESHOLD
+                  ? "stable"
+                  : newLatency > previous
+                    ? "up"
+                    : newLatency < previous
+                      ? "down"
+                      : null,
               );
             }
             return newHistory;

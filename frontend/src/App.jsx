@@ -17,7 +17,6 @@ import { getOpacity, normalizeAlarmTaxi } from "./utils/helper.js";
 function App() {
   const now = useNow();
   const debugLog = useDebugLog();
-  const seenTaxiIdRef = useRef(new Set());
   const [selectedTaxiId, setSelectedTaxiId] = useState(null);
   const { pathLocations, pathError, appendLiveUpdate } =
     useTaxiPath(selectedTaxiId);
@@ -39,20 +38,8 @@ function App() {
         "taxiUpdate",
         `snapshot — ${data.taxis.length} taxis loaded`,
       );
-      seenTaxiIdRef.current = new Set(data.taxis.map((t) => String(t.taxi_id)));
     },
     onTaxiUpdate: (t) => {
-      const isNewTaxi = !seenTaxiIdRef.current.has(String(t.taxi_id));
-      if (isNewTaxi) {
-        debugLog.addEntry(
-          "taxiUpdate",
-          `NEW taxi ${t.taxi_id} appeared`,
-          // `taxi ${t.taxi_id} → (${t.latitude.toFixed(4)}, ${t.longitude.toFixed(4)}) ${t.speed.toFixed(1)} km/h${t.isSpeeding ? " ⚡" : ""}${t.isParking ? " 🅿" : ""}`,
-          t.taxi_id,
-        );
-        seenTaxiIdRef.current.add(String(t.taxi_id));
-      }
-
       // Handle speeding state transitions
       if (t.speedingStateChanged) {
         if (t.isSpeeding) {
@@ -286,6 +273,9 @@ function App() {
           )}
           {latencyTrend === "down" && (
             <span style={{ color: "#16a34a", marginLeft: 4 }}>↓</span>
+          )}
+          {latencyTrend === "stable" && (
+            <span style={{ color: "#6b7280", marginLeft: 4 }}>→</span>
           )}
         </span>
         {pathError && (
