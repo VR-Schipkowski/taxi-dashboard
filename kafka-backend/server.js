@@ -50,6 +50,11 @@ setInterval(() => {
     );
   }
 }, 5000);
+
+setInterval(async () => {
+  const total = parseFloat(await redis.get("stats:total_distance")) || 0;
+  broadcast({ type: "totalDistanceUpdate", totalDistanceAll: total });
+}, 5000);
 // DEBUG ENDPOINT - remove before production
 app.get("/debug", async (req, res) => {
   const keys = await redis.keys("taxi:speed:*");

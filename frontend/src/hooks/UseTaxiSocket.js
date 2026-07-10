@@ -34,12 +34,13 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
   const [status, setStatus] = useState("Connecting...");
 
   const [latency, setLatency] = useState(null);
-  const [latencyHistory, setLatencyHistory] = useState([]);
+  // const [latencyHistory, setLatencyHistory] = useState([]);// TODO: latencyHistory is unused
+  const [setLatencyHistory] = useState([]);
   const [latencyTrend, setLatencyTrend] = useState(null);
   const [heatmapCells, setHeatmapCells] = useState({});
   const [totalDistanceAll, setTotalDistanceAll] = useState(null);
 
-  // TODO: this batching path is currently dead code — nothing ever writes
+  // TODO: this batching path is currently dead code — nothing ever writes // think might be fixed?
   // into pendingUpdates.current, so the flush interval below never has
   // anything to flush. taxiUpdate messages apply immediately instead (see
   // below). Kept as-is to preserve existing behavior; either wire
@@ -96,8 +97,7 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
           }
         } else if (data.type === "taxiUpdate") {
           const t = data.taxi;
-          setTaxiMap((prev) => ({ ...prev, [t.taxi_id]: t }));
-          setLastSeen((prev) => ({ ...prev, [t.taxi_id]: Date.now() }));
+          pendingUpdates.current[t.taxi_id] = t; //flush fix
           cb.onTaxiUpdate?.(t);
         } else if (data.type === "latencyStats") {
           const newLatency = data.stats.avgLatencyMs / 1000; // ms -> s
@@ -132,6 +132,9 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
         } else if (data.type === "heatmapUpdate") {
           const cell = data.cellData;
           setHeatmapCells((prev) => ({ ...prev, [cell.cellId]: cell }));
+        }
+        else if (data.type === "totalDistanceUpdate") {
+          setTotalDistanceAll(data.totalDistanceAll);
         }
         else if (data.type === "ooaNotification") {
           cb.onOoaNotification?.(data);
