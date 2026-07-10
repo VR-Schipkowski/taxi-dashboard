@@ -1,5 +1,6 @@
 package com.taxifleet.functions;
 
+import com.taxifleet.helper.RedisSink;
 import com.taxifleet.models.TaxiSpeed;
 import org.apache.flink.api.common.state.MapState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
@@ -14,12 +15,14 @@ public class TotalDistanceFunction
 
     protected transient MapState<Integer, Double> DistanceDict;
     protected transient ValueState<Double> distanceTotal;
+    private transient RedisSink redisSink;
 
     @Override
     public void open(Configuration parameters) {
         DistanceDict = getRuntimeContext().getMapState(
                 new MapStateDescriptor<>("distance-dict", Integer.class, Double.class));
         distanceTotal = getRuntimeContext().getState(new ValueStateDescriptor<>("distance-total", Double.class));
+        redisSink = new RedisSink("redis", 6379);
     }
 
     @Override
@@ -38,5 +41,6 @@ public class TotalDistanceFunction
         totalDistance += taxiDistance;
         distanceTotal.update(totalDistance);
         out.collect(totalDistance);
+        redisSink.storeTotal(totalDistance);
     }
 }

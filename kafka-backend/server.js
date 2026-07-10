@@ -120,7 +120,7 @@ async function buildSnapshot() {
           data.lastMoved && data.lastMoved !== "null" ? data.lastMoved : "",
         isParking: data.isParking === "true",
       });
-      totalDistanceAll += parseFloat(data.totalDistance) || 0;
+      totalDistanceAll = await redis.get("stats:total_distance");
     }
   }
   return { taxis, totalDistanceAll };

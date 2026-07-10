@@ -50,5 +50,13 @@ public class RedisSink implements Serializable {
         } catch (Exception e) {
             System.err.println("Redis write failed for taxi " + speed.taxi_id + ": " + e.getMessage());
         }
+
+    }
+    public void storeTotal(double total) {
+        try (Jedis jedis = getPool().getResource()) {
+        jedis.set("stats:total_distance", String.valueOf(total));
+        } catch (Exception e) {
+            System.err.println("Redis write failed for total distance " + total + ": " + e.getMessage());
+        }
     }
 }

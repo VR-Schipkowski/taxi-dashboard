@@ -25,6 +25,7 @@ public class HeatmapPipeline {
                         new HeatmapWindowProcessor())// 3. Nachgelagertes KeyedProcess, um Lücken mit Nullen aufzufüllen
                 .keyBy(cell -> cell.cellId)
                 .process(new ZeroFillProcessFunction(CHECK_INTERVAL, WINDOW_SIZE))
+                .returns(HeatmapCell.class)
                 .name("Smoothed Heatmap with Zero Fill");
     }
 }
