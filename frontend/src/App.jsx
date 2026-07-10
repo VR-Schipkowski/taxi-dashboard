@@ -33,6 +33,7 @@ function App() {
     latency,
     latencyTrend,
     heatmapCells,
+    totalDistanceAll,
   } = useTaxiSocket(WS_LINK, {
     onSnapshot: (data) => {
       debugLog.addEntry(
@@ -88,15 +89,6 @@ function App() {
       debugLog.addEntry('area', `taxi ${taxiId} — ${label}`, taxiId);
     },
   });
-  // TODO: should be calculated in flink via map reduce
-  const totalDistanceAll = useMemo(
-    () =>
-      Object.values(taxiMap).reduce(
-        (sum, taxi) => sum + (taxi.totalDistance || 0),
-        0,
-      ),
-    [taxiMap],
-  );
 
   // filtering
   const [activeFilters, setActiveFilters] = useState({
@@ -220,8 +212,8 @@ function App() {
         <span style={{ fontSize: 13, color: "#555" }}>
           <strong>Total distance travelled:</strong>{" "}
           {totalDistanceAll != null
-            ? `${totalDistanceAll.toFixed(1)} km`
-            : "N/A"}
+              ? `${totalDistanceAll.toFixed(1)} km`
+              : "N/A"}
         </span>
 
         <TaxiSearchBox

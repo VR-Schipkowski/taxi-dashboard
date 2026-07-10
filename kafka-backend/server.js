@@ -102,7 +102,7 @@ function broadcast(payload) {
 async function buildSnapshot() {
   const keys = await redis.keys("taxi:speed:*");
   const taxis = [];
-  let totalDistanceAll = 0;
+  const totalDistanceAll = parseFloat(await redis.get("stats:total_distance")) || 0;
   for (const key of keys) {
     const data = await redis.hgetall(key);
     if (data && data.latitude && data.longitude) {
@@ -120,7 +120,6 @@ async function buildSnapshot() {
           data.lastMoved && data.lastMoved !== "null" ? data.lastMoved : "",
         isParking: data.isParking === "true",
       });
-      totalDistanceAll = await redis.get("stats:total_distance");
     }
   }
   return { taxis, totalDistanceAll };

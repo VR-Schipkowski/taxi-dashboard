@@ -37,6 +37,7 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
   const [latencyHistory, setLatencyHistory] = useState([]);
   const [latencyTrend, setLatencyTrend] = useState(null);
   const [heatmapCells, setHeatmapCells] = useState({});
+  const [totalDistanceAll, setTotalDistanceAll] = useState(null);
 
   // TODO: this batching path is currently dead code — nothing ever writes
   // into pendingUpdates.current, so the flush interval below never has
@@ -85,6 +86,7 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
           setLastSeen(seen);
           setSpeedingIncidents(data.speedingIncidents || []);
           setAreaViolations(data.areaViolations || []);
+          setTotalDistanceAll(data.stats?.totalDistanceAll ?? null);
           cb.onSnapshot?.(data);
 
           if (data.stats && data.stats.avgLatencyMs) {
@@ -150,5 +152,6 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
     latency,
     latencyTrend,
     heatmapCells,
+    totalDistanceAll,
   };
 }
