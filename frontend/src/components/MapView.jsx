@@ -33,9 +33,73 @@ function RecenterMap({ selectedTaxi }) {
   return null;
 }
 
+// Compact status card shown in a taxi's popup.
+function TaxiPopup({ taxi, isSpeeding, isOutOfArea }) {
+  // Prefer totalDistance (the field the backend sends); fall back to distance.
+  const distanceKm = taxi.totalDistance ?? taxi.distance;
+
+  const badges = [];
+  if (isSpeeding) badges.push(["Speeding", "#993C1D", "#FAECE7"]);
+  if (isOutOfArea) badges.push(["Out of area", "#B45309", "#FEF3E2"]);
+  if (taxi.isParking) badges.push(["Parked", "#4B5563", "#F1F2F4"]);
+  if (badges.length === 0) badges.push(["Active", "#185FA5", "#E6F1FB"]);
+
+  const rows = [
+    ["Speed", taxi.speed != null ? `${taxi.speed.toFixed(1)} km/h` : "—"],
+    ["Avg speed", taxi.averageSpeed != null ? `${taxi.averageSpeed.toFixed(1)} km/h` : "—"],
+    ["Distance", distanceKm != null ? `${distanceKm.toFixed(2)} km` : "—"],
+    ["Updated", taxi.timestamp ?? "—"],
+  ];
+
+  return (
+    <div style={{ fontSize: 13, minWidth: 190, fontFamily: "sans-serif" }}>
+      <div
+        style={{
+          fontSize: 15,
+          fontWeight: 700,
+          color: "#111",
+          marginBottom: 6,
+          paddingBottom: 6,
+          borderBottom: "1px solid #eef0f2",
+        }}
+      >
+        🚖 Taxi {taxi.taxi_id}
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+        {badges.map(([label, color, bg]) => (
+          <span
+            key={label}
+            style={{
+              fontSize: 11,
+              fontWeight: 600,
+              padding: "1px 7px",
+              borderRadius: 999,
+              background: bg,
+              color,
+            }}
+          >
+            {label}
+          </span>
+        ))}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", rowGap: 4, columnGap: 10 }}>
+        {rows.map(([label, value]) => (
+          <div key={label} style={{ display: "contents" }}>
+            <span style={{ color: "#8a8f98", fontSize: 12 }}>{label}</span>
+            <span style={{ color: "#1f2328", fontWeight: 500, textAlign: "right" }}>
+              {value}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Renders the full live map: base tiles, clustered taxi markers, the
 // selected taxi's recent path, and auto-recentering on selection.
-//TODO: adding is parking if taxi is cliced
 export function MapView({
   taxiMap,
   taxis,
@@ -97,21 +161,11 @@ export function MapView({
               eventHandlers={{ click: () => onSelectTaxi(taxi.taxi_id) }}
             >
               <Popup>
-                <div style={{ fontSize: 14 }}>
-                  <strong>Taxi ID:</strong> {taxi.taxi_id}
-                  <br />
-                  <strong>Timestamp:</strong> {taxi.timestamp}
-                  <br />
-                  <strong>Average Speed:</strong>{" "}
-                  {taxi.averageSpeed?.toFixed(1)} km/h
-                  <br />
-                  <strong>Speed:</strong> {taxi.speed?.toFixed(1)} km/h
-                  {isSpeeding ? " ⚠️ Speeding!" : ""}
-                  <br />
-                  <strong>Distance:</strong> {taxi.distance?.toFixed(2)} km
-                  <br />
-                  {isOutOfArea ? " ⚠️ Out of Area!" : ""}
-                </div>
+                <TaxiPopup
+                  taxi={taxi}
+                  isSpeeding={isSpeeding}
+                  isOutOfArea={isOutOfArea}
+                />
               </Popup>
             </Marker>
           );
