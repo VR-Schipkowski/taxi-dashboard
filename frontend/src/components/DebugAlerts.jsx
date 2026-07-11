@@ -93,13 +93,14 @@ export function DebugAlerts({
             alignItems: "center",
           }}
         >
-          {["speeding", "area", "taxiUpdate"].map((type) => {
+          {["speeding", "area"].map((type) => {
             const s = TAG_STYLES[type];
-            const label = type === "taxiUpdate" ? "updates" : type;
+            const active = filters[type];
             return (
               <button
                 key={type}
                 onClick={() => onToggleFilter(type)}
+                title={active ? `Hide ${type} alerts` : `Show ${type} alerts`}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -107,19 +108,22 @@ export function DebugAlerts({
                   padding: "2px 8px",
                   borderRadius: 4,
                   fontSize: 11,
-                  fontWeight: 500,
+                  fontWeight: 600,
                   cursor: "pointer",
+                  // Active filter reads as "focused": solid status colour, filled
+                  // background. Inactive is a plain outline — no greying-out.
                   border: `1px solid ${s.dot}`,
-                  background: filters[type] ? s.bg : "#f3f4f6",
-                  color: filters[type] ? s.color : "#888",
-                  opacity: filters[type] ? 1 : 0.6,
+                  background: active ? s.bg : "#fff",
+                  color: active ? s.color : "#374151",
+                  boxShadow: active ? `inset 0 0 0 1px ${s.dot}` : "none",
                   transition: "all 0.15s",
                 }}
               >
-                {label}
+                {type}
                 <span
                   style={{
-                    background: "rgba(0,0,0,0.12)",
+                    background: active ? s.dot : "#e5e7eb",
+                    color: active ? "#fff" : "#6b7280",
                     borderRadius: 999,
                     padding: "0 5px",
                     fontSize: 10,
@@ -149,10 +153,7 @@ export function DebugAlerts({
       </div>
 
       {/* Log */}
-      <div
-        ref={logRef}
-        style={{ flex: 1, overflowY: "auto", padding: "4px 0" }}
-      >
+      <div ref={logRef} style={{ flex: 1, overflowY: "auto", padding: "4px 0" }}>
         {visible.length === 0 ? (
           <div
             style={{ padding: "2rem 1rem", textAlign: "center", color: "#aaa" }}

@@ -34,11 +34,9 @@ function App() {
     heatmapCells,
     totalDistanceAll,
   } = useTaxiSocket(WS_LINK, {
-    onSnapshot: (data) => {
-      debugLog.addEntry(
-        "taxiUpdate",
-        `snapshot — ${data.taxis.length} taxis loaded`,
-      );
+    onSnapshot: () => {
+      // Position updates are no longer logged to the alerts panel; only
+      // speeding and area violations appear there.
     },
     onTaxiUpdate: (t) => {
       // Handle speeding state transitions
