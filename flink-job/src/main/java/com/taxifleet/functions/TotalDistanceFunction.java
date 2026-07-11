@@ -35,7 +35,7 @@ public class TotalDistanceFunction
         if(!DistanceDict.contains(taxiSpeed.taxi_id)){
             taxiDistance = taxiSpeed.totalDistance;
         } else{
-            taxiDistance = taxiSpeed.totalDistance - DistanceDict.get(taxiSpeed.taxi_id);
+            taxiDistance = Math.max(taxiSpeed.totalDistance - DistanceDict.get(taxiSpeed.taxi_id), 0.0);
         }
         DistanceDict.put(taxiSpeed.taxi_id, taxiSpeed.totalDistance);
         totalDistance += taxiDistance;
