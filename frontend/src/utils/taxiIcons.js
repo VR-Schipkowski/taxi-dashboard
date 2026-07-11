@@ -17,49 +17,67 @@ function createDotIcon({
   });
 }
 
+// Status colours. Out-of-area is orange (per the professor's suggestion),
+// distinct from the red used for speeding.
+const COLORS = {
+  default: "#378ADD",
+  speeding: "#E2462F",
+  area: "#F59E0B", // orange (was green #1F9D55)
+  parking: "#9CA3AF",
+};
+
+// Selection ring colour — drawn around whatever status colour the taxi has,
+// so a selected taxi keeps its speeding/area/parking colour instead of turning
+// blue.
+const SELECTION_RING = "rgba(29,78,216,0.55)";
+
 export const defaultIcon = createDotIcon({
-  color: "#378ADD",
+  color: COLORS.default,
   variant: "default",
 });
 export const speedingIcon = createDotIcon({
-  color: "#E2462F",
+  color: COLORS.speeding,
   size: 16,
   variant: "speeding",
 });
 export const ooaIcon = createDotIcon({
-  color: "#1F9D55",
+  color: COLORS.area,
   size: 16,
   variant: "area",
 });
 export const parkingIcon = createDotIcon({
-  color: "#9CA3AF",
+  color: COLORS.parking,
   variant: "parking",
 });
-export const selectedIcon = createDotIcon({
-  color: "#1D4ED8",
-  size: 20,
-  variant: "selected",
-  ring: true,
-  ringColor: "rgba(29,78,216,0.35)",
-});
+
+// Selected variants: same status colour, but larger with a selection ring.
+// Keeps the taxi's status recognisable while marking it as focused.
+const selectedIcons = {
+  default: createDotIcon({ color: COLORS.default, size: 20, variant: "selected default", ring: true, ringColor: SELECTION_RING }),
+  speeding: createDotIcon({ color: COLORS.speeding, size: 20, variant: "selected speeding", ring: true, ringColor: SELECTION_RING }),
+  area: createDotIcon({ color: COLORS.area, size: 20, variant: "selected area", ring: true, ringColor: SELECTION_RING }),
+  parking: createDotIcon({ color: COLORS.parking, size: 20, variant: "selected parking", ring: true, ringColor: SELECTION_RING }),
+};
 
 export const TAG_STYLES = {
   speeding: { bg: "#FAECE7", color: "#993C1D", dot: "#D85A30" },
-  area: { bg: "#E6F6ED", color: "#1F7A43", dot: "#1F9D55" },
-  taxiUpdate: { bg: "#E6F1FB", color: "#185FA5", dot: "#378ADD" },
+  area: { bg: "#FEF3E2", color: "#B45309", dot: "#F59E0B" }, // orange to match OOA marker
 };
 
-// Picks which pre-built dot icon a taxi marker should use, in priority order.
-export function pickTaxiIcon({
-  isSelected,
-  isSpeeding,
-  isOutOfArea,
-  isParking,
-}) {
-  if (isSelected) return selectedIcon;
-  if (isSpeeding) return speedingIcon;
-  if (isOutOfArea) return ooaIcon;
-  if (isParking) return parkingIcon;
+// Picks which pre-built dot icon a taxi marker should use. A selected taxi keeps
+// its status colour (speeding/area/parking/default) and gains a selection ring,
+// rather than being recoloured blue.
+export function pickTaxiIcon({ isSelected, isSpeeding, isOutOfArea, isParking }) {
+  let status = "default";
+  if (isSpeeding) status = "speeding";
+  else if (isOutOfArea) status = "area";
+  else if (isParking) status = "parking";
+
+  if (isSelected) return selectedIcons[status];
+
+  if (status === "speeding") return speedingIcon;
+  if (status === "area") return ooaIcon;
+  if (status === "parking") return parkingIcon;
   return defaultIcon;
 }
 
