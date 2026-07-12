@@ -10,8 +10,8 @@ export const WS_LINK = "ws://localhost:5001";
 // export const WS_LINK = 'ws://34.28.224.202:5001';
 
 // consts for path display number of points and time interval for path display
-export const PATH_LOCATIONS_LIMIT = 30;
-export const PATH_TIME_INTERVAL = 15; // in minutes
+export const PATH_LOCATIONS_LIMIT = 120;
+export const PATH_TIME_INTERVAL = 60; // in minutes
 
 // Fading of stale markers
 export const STALE_AFTER_MS = 30 * 1000;

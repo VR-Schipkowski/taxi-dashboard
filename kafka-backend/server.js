@@ -20,8 +20,8 @@ const kafka = new Kafka({ brokers: ["kafka:9092"] });
 app.get("/taxis/:id/locations", async (req, res) => {
   const { id } = req.params;
 
-  const timeInterval = Number(req.query.time_interval) || 15;
-  const number = Number(req.query.number) || 10;
+  const timeInterval = Number(req.query.time_interval) || 60;
+  const number = Number(req.query.number) || 120;
 
   try {
     const upstream = await fetch(
