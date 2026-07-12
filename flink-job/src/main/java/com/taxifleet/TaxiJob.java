@@ -104,6 +104,7 @@ public class TaxiJob {
                                         s.latitude = loc.latitude;
                                         s.longitude = loc.longitude;
                                         s.isOutOfArea = true;
+                                        s.ingested_at = loc.ingested_at;
                                         return s;
                                 });
 
@@ -116,6 +117,7 @@ public class TaxiJob {
                                         s.latitude = loc.latitude;
                                         s.longitude = loc.longitude;
                                         s.isOutOfArea = false;
+                                        s.ingested_at = loc.ingested_at;
                                         return s;
                                 });
 

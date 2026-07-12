@@ -43,30 +43,48 @@ INSERT INTO taxi_speed (
 )
 """
 
+KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "taxi-processed")
+KAFKA_OOA_TOPIC = os.environ.get("KAFKA_OOA_TOPIC", "taxi-out-of-area")
+KAFKA_GROUP_ID = os.environ.get("KAFKA_GROUP_ID", "taxi-api-consumer")
+
 
 def store_event(record: dict) -> None:
+    payload = {
+        "taxi_id": record.get("taxi_id"),
+        "timestamp": record.get("timestamp"),
+        "longitude": record.get("longitude"),
+        "latitude": record.get("latitude"),
+        "speed": record.get("speed"),
+        "averageSpeed": record.get("averageSpeed"),
+        "totalDistance": record.get("totalDistance"),
+        "isSpeeding": record.get("isSpeeding", False),
+        "isOutOfArea": record.get("isOutOfArea", False),
+        "lastMoved": record.get("lastMoved"),
+        "isParking": record.get("isParking", False),
+        "ingested_at": record.get("ingested_at"),
+    }
     with get_conn() as conn:
         with conn.cursor() as cur:
-            cur.execute(INSERT_SQL, record)
-        conn.commit()
+            cur.execute(INSERT_SQL, payload)
+            conn.commit()
 
 
 def consume_loop() -> None:
     consumer = KafkaConsumer(
         KAFKA_TOPIC,
+        KAFKA_OOA_TOPIC,
         bootstrap_servers=KAFKA_BOOTSTRAP,
         group_id=KAFKA_GROUP_ID,
         value_deserializer=lambda v: json.loads(v.decode("utf-8")),
         auto_offset_reset="earliest",
         enable_auto_commit=True,
     )
-    log.info("Kafka-Consumer gestartet fuer Topic '%s'", KAFKA_TOPIC)
+    log.info("Kafka-Consumer gestartet fuer Topics '%s', '%s'", KAFKA_TOPIC, KAFKA_OOA_TOPIC)
     for message in consumer:
         try:
             store_event(message.value)
         except Exception:
             log.exception("Konnte Event nicht speichern: %s", message.value)
-
 
 def reset_database() -> None:
     """Clear stored taxi data on startup.
