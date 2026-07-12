@@ -89,6 +89,7 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
           setAreaViolations(data.areaViolations || []);
           setTotalDistanceAll(data.stats?.totalDistanceAll ?? null);
           cb.onSnapshot?.(data);
+          setHeatmapCells(data.heatmapCells || {});
 
           if (data.stats && data.stats.avgLatencyMs) {
             const initialLatency = data.stats.avgLatencyMs / 1000;
@@ -130,16 +131,13 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
           setAreaViolations(violations);
           cb.onAreaViolation?.(violations);
         } else if (data.type === "heatmapUpdate") {
-          const cell = data.cellData;
-          setHeatmapCells((prev) => ({ ...prev, [cell.cellId]: cell }));
-        }
-        else if (data.type === "totalDistanceUpdate") {
+          const cells = data.cellData;
+          setHeatmapCells(cells);
+        } else if (data.type === "totalDistanceUpdate") {
           setTotalDistanceAll(data.totalDistanceAll);
-        }
-        else if (data.type === "ooaNotification") {
+        } else if (data.type === "ooaNotification") {
           cb.onOoaNotification?.(data);
         }
-
       } catch (error) {
         console.error("Error parsing WebSocket data:", error);
       }
