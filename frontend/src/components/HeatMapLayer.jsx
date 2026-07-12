@@ -6,11 +6,11 @@ import { decodeCellId } from "../utils/heatmap_helper.js";
 
 export function HeatMapLayer({
   cells,
-  radius = 70,
-  blur = 45,
-  maxZoom = 5,
-  max = 600,
-  opacity = 0.1,
+  radius = 90,
+  blur = 70,
+  maxZoom = 15,
+  max = 50,
+  opacity = 0.2,
 }) {
   const map = useMap();
 

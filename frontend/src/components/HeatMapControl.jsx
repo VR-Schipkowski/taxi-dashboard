@@ -62,7 +62,7 @@ export function HeatMapControl({ cells }) {
             <SliderRow
               label="Radius"
               value={radius}
-              min={10}
+              min={50}
               max={150}
               onChange={setRadius}
             />
@@ -84,7 +84,7 @@ export function HeatMapControl({ cells }) {
               label="Max occupancy"
               value={max}
               min={1}
-              max={2000}
+              max={500}
               onChange={setMax}
             />
           </div>
