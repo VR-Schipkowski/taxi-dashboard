@@ -2,8 +2,8 @@
 //change for deployment
 
 // //uncomment for local
-export const BACKEND = "http://localhost:5001";
-export const WS_LINK = "ws://localhost:5001";
+//export const BACKEND = "http://localhost:5001";
+//export const WS_LINK = "ws://localhost:5001";
 
 // uncomment for cloud deploy
 // export const BACKEND = 'http://34.28.224.202:5001';
