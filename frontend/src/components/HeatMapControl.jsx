@@ -1,24 +1,33 @@
-import { useEffect, useRef, useState } from "react";
-import L from "leaflet";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { HeatMapLayer } from "./HeatMapLayer.jsx";
 
 const DEFAULTS = { radius: 70, blur: 45, maxZoom: 5, max: 600 };
+const DEBOUNCE_MS = 60;
 
 export function HeatMapControl({ cells }) {
   const [enabled, setEnabled] = useState(true);
   const [open, setOpen] = useState(false);
+
+  // "live" values drive the slider UI instantly
+  const [liveRadius, setLiveRadius] = useState(DEFAULTS.radius);
+  const [liveBlur, setLiveBlur] = useState(DEFAULTS.blur);
+  const [liveMaxZoom, setLiveMaxZoom] = useState(DEFAULTS.maxZoom);
+  const [liveMax, setLiveMax] = useState(DEFAULTS.max);
+
+  // "committed" values are what actually get passed to the heat layer
   const [radius, setRadius] = useState(DEFAULTS.radius);
   const [blur, setBlur] = useState(DEFAULTS.blur);
   const [maxZoom, setMaxZoom] = useState(DEFAULTS.maxZoom);
   const [max, setMax] = useState(DEFAULTS.max);
-  const controlRef = useRef(null);
 
-  useEffect(() => {
-    if (!controlRef.current) return;
+  const timerRef = useRef(null);
 
-    L.DomEvent.disableClickPropagation(controlRef.current);
-    L.DomEvent.disableScrollPropagation(controlRef.current);
+  const commit = useCallback((setter, value) => {
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setter(value), DEBOUNCE_MS);
   }, []);
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
 
   return (
     <>
@@ -32,7 +41,7 @@ export function HeatMapControl({ cells }) {
         />
       )}
 
-      <div ref={controlRef} style={wrapperStyle}>
+      <div style={wrapperStyle}>
         <button
           onClick={() => setOpen((o) => !o)}
           style={buttonStyle}
@@ -61,31 +70,43 @@ export function HeatMapControl({ cells }) {
 
             <SliderRow
               label="Radius"
-              value={radius}
+              value={liveRadius}
               min={50}
               max={150}
-              onChange={setRadius}
+              onChange={(v) => {
+                setLiveRadius(v);
+                commit(setRadius, v);
+              }}
             />
             <SliderRow
               label="Blur"
-              value={blur}
+              value={liveBlur}
               min={0}
               max={100}
-              onChange={setBlur}
+              onChange={(v) => {
+                setLiveBlur(v);
+                commit(setBlur, v);
+              }}
             />
             <SliderRow
               label="Max zoom"
-              value={maxZoom}
+              value={liveMaxZoom}
               min={1}
               max={20}
-              onChange={setMaxZoom}
+              onChange={(v) => {
+                setLiveMaxZoom(v);
+                commit(setMaxZoom, v);
+              }}
             />
             <SliderRow
               label="Max occupancy"
-              value={max}
+              value={liveMax}
               min={1}
               max={500}
-              onChange={setMax}
+              onChange={(v) => {
+                setLiveMax(v);
+                commit(setMax, v);
+              }}
             />
           </div>
         )}
