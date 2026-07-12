@@ -176,7 +176,7 @@ public class TaxiJob {
                 StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
                 // set paralism, hast to be matched the partitions in kafka, otherwisekafka will
                 // slow down as only so many patritions can be written to in parallel
-                env.setParallelism(4);
+                env.setParallelism(8);
                 System.out.println("Flink Taxi Job starting - connecting to Kafka...");
 
                 ObjectMapper mapper = new ObjectMapper();
