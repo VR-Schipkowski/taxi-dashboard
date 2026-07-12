@@ -157,12 +157,18 @@ public class TaxiJob {
         private static void processHeatmap(DataStream<TaxiSpeed> locationStream, KafkaSink<String> heatmapSink,
                         ObjectMapper mapper) {
                 DataStream<HeatmapCell> heatmapStream = HeatmapPipeline.build(locationStream);
-
                 heatmapStream
-                                .map(mapper::writeValueAsString)
+                                .map(cell -> {
+                                        try {
+                                                return mapper.writeValueAsString(cell);
+                                        } catch (Exception e) {
+                                                throw new RuntimeException(e);
+                                        }
+                                })
                                 .returns(String.class)
                                 .sinkTo(heatmapSink)
                                 .name("Heatmap Distinct Taxi Count per Cell");
+
         }
 
         // ----------------- main function
