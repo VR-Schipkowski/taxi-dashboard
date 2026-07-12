@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import L from "leaflet";
 import { HeatMapLayer } from "./HeatMapLayer.jsx";
 
 const DEFAULTS = { radius: 70, blur: 45, maxZoom: 5, max: 600 };
@@ -10,6 +11,14 @@ export function HeatMapControl({ cells }) {
   const [blur, setBlur] = useState(DEFAULTS.blur);
   const [maxZoom, setMaxZoom] = useState(DEFAULTS.maxZoom);
   const [max, setMax] = useState(DEFAULTS.max);
+  const controlRef = useRef(null);
+
+  useEffect(() => {
+    if (!controlRef.current) return;
+
+    L.DomEvent.disableClickPropagation(controlRef.current);
+    L.DomEvent.disableScrollPropagation(controlRef.current);
+  }, []);
 
   return (
     <>
@@ -23,7 +32,7 @@ export function HeatMapControl({ cells }) {
         />
       )}
 
-      <div style={wrapperStyle}>
+      <div ref={controlRef} style={wrapperStyle}>
         <button
           onClick={() => setOpen((o) => !o)}
           style={buttonStyle}
