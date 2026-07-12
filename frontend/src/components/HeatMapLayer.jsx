@@ -25,9 +25,6 @@ export function HeatMapLayer({
       opacity,
     }).addTo(map);
 
-    // Defensive patch: leaflet.heat's internal redraw runs on a queued
-    // requestAnimationFrame. If the layer is removed before that frame
-    // fires, this._map is null and the original _redraw throws.
     const originalRedraw = heatLayer._redraw.bind(heatLayer);
     heatLayer._redraw = () => {
       if (!heatLayer._map) return;
@@ -40,7 +37,6 @@ export function HeatMapLayer({
       map.removeLayer(heatLayer);
       layerRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
 
   // update points in place
