@@ -34,7 +34,7 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
   const [status, setStatus] = useState("Connecting...");
 
   const [latency, setLatency] = useState(null);
-  const [setLatencyHistory] = useState([]);
+  const [latencyHistory, setLatencyHistory] = useState([]);
   const [latencyTrend, setLatencyTrend] = useState(null);
   const [heatmapCells, setHeatmapCells] = useState({});
   const [totalDistanceAll, setTotalDistanceAll] = useState(null);
