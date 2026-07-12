@@ -6,8 +6,8 @@
 export const BACKEND = "http://35.193.16.110:5001";
 export const WS_LINK = "ws://35.193.16.110:5001";
 // consts for path display number of points and time interval for path display
-export const PATH_LOCATIONS_LIMIT = 120;
-export const PATH_TIME_INTERVAL = 60; // in minutes
+export const PATH_LOCATIONS_LIMIT = 120 * 8;
+export const PATH_TIME_INTERVAL = 60 * 8; // in minutes
 
 // Fading of stale markers
 export const STALE_AFTER_MS = 30 * 1000;
