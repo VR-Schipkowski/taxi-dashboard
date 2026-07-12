@@ -71,7 +71,7 @@ export function HeatMapControl({ cells }) {
             <SliderRow
               label="Radius"
               value={liveRadius}
-              min={50}
+              min={30}
               max={150}
               onChange={(v) => {
                 setLiveRadius(v);
