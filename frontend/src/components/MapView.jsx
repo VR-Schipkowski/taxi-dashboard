@@ -136,7 +136,7 @@ export function MapView({
         attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      {<HeatMapControl cells={cells} />}
+      {<HeatMapControl cells={heatmapCells} />}
       <MarkerClusterGroup
         chunkedLoading
         iconCreateFunction={createClusterIcon}
