@@ -119,10 +119,6 @@ public class TaxiJob {
                                         return s;
                                 });
 
-                outOfAreaStream
-                                .process(new RedisSinkFunction())
-                                .name("Store OOA to Redis");
-
                 DataStream<String> areaSnapshot = outOfAreaStream
                                 .union(ooaReturnedStream)
                                 .keyBy(speed -> 0)
