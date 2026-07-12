@@ -157,6 +157,7 @@ setInterval(async () => {
   const total = parseFloat(await redis.get("stats:total_distance")) || 0;
   broadcast({ type: "totalDistanceUpdate", totalDistanceAll: total });
 }, 5000);
+
 setInterval(async () => {
   broadcast({ type: "heatmapUpdate", cellData: snapshot.heatmapCells });
 }, 1000 * 30);
@@ -224,7 +225,10 @@ async function startConsumers() {
   await speedingConsumer.run({
     eachMessage: async ({ message }) => {
       snapshot.speedingIncidents = JSON.parse(message.value.toString());
-      broadcast({ type: "speedingAlert", speedingIncidents: snapshot.speedingIncidents });
+      broadcast({
+        type: "speedingAlert",
+        speedingIncidents: snapshot.speedingIncidents,
+      });
     },
   });
 
