@@ -46,31 +46,68 @@ export function DebugAlerts({
             padding: "8px 12px",
             borderBottom: "1px solid #e5e7eb",
             background: "#FAFAFA",
+            // Cap the height so a long violator list scrolls instead of pushing
+            // the alert log off-screen. minHeight:0 is required — without it a
+            // flex child refuses to shrink below its content and the inner
+            // overflow never actually scrolls.
+            display: "flex",
+            flexDirection: "column",
+            maxHeight: 220,
+            minHeight: 0,
+            flexShrink: 0,
           }}
         >
-          <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6 }}>
-            Current Violators
+          <div
+            style={{
+              fontWeight: 600,
+              fontSize: 12,
+              marginBottom: 6,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <span>Current Violators</span>
+            <span
+              style={{
+                background: "#e5e7eb",
+                color: "#6b7280",
+                borderRadius: 999,
+                padding: "0 6px",
+                fontSize: 10,
+                fontWeight: 600,
+              }}
+            >
+              {(activeFilters.speeding ? speedingIncidents.length : 0) +
+                (activeFilters.area ? areaViolations.length : 0)}
+            </span>
           </div>
-          {activeFilters.speeding &&
-            speedingIncidents.map((i) => (
-              <div
-                key={`s-${i.taxi_id}`}
-                onClick={() => onSelectTaxi(i.taxi_id)}
-                style={{ cursor: "pointer", fontSize: 11, padding: "2px 0" }}
-              >
-                🚖 {i.taxi_id} — {i.speed?.toFixed(1)} km/h
-              </div>
-            ))}
-          {activeFilters.area &&
-            areaViolations.map((v) => (
-              <div
-                key={`a-${v.taxi_id}`}
-                onClick={() => onSelectTaxi(v.taxi_id)}
-                style={{ cursor: "pointer", fontSize: 11, padding: "2px 0" }}
-              >
-                🚖 {v.taxi_id} — outside permitted area
-              </div>
-            ))}
+
+          {/* The actual scrolling list. Scroll lives here, not on the wrapper,
+              so the header stays put and the overflow works. */}
+          <div style={{ overflowY: "auto", minHeight: 0, flex: 1 }}>
+            {activeFilters.speeding &&
+              speedingIncidents.map((i) => (
+                <div
+                  key={`s-${i.taxi_id}`}
+                  onClick={() => onSelectTaxi(i.taxi_id)}
+                  style={{ cursor: "pointer", fontSize: 11, padding: "2px 0" }}
+                >
+                  🚖 {i.taxi_id} — {i.speed?.toFixed(1)} km/h
+                </div>
+              ))}
+            {activeFilters.area &&
+              areaViolations.map((v) => (
+                <div
+                  key={`a-${v.taxi_id}`}
+                  onClick={() => onSelectTaxi(v.taxi_id)}
+                  style={{ cursor: "pointer", fontSize: 11, padding: "2px 0" }}
+                >
+                  🚖 {v.taxi_id} — outside permitted area
+                </div>
+              ))}
+          </div>
         </div>
       )}
       {/* Header */}
