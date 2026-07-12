@@ -156,7 +156,14 @@ setInterval(async () => {
   }
   const total = parseFloat(await redis.get("stats:total_distance")) || 0;
   broadcast({ type: "totalDistanceUpdate", totalDistanceAll: total });
+  broadcast({ type: "heatmapUpdate", cellData: snapshot.heatmapCells });
 }, 5000);
+setInterval(
+  async () => {
+    broadcast({ type: "heatmapUpdate", cellData: snapshot.heatmapCells });
+  },
+  1000 * 60 * 4,
+);
 
 function broadcast(payload) {
   const msg = JSON.stringify(payload);
@@ -283,7 +290,6 @@ async function startConsumers() {
 
       if (cell.cellId) {
         snapshot.heatmapCells[cell.cellId] = cell;
-        broadcast({ type: "heatmapCell", cell });
       }
     },
   });
