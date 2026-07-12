@@ -10,7 +10,7 @@ import {
 import MarkerClusterGroup from "react-leaflet-cluster";
 
 import { pickTaxiIcon, createClusterIcon } from "../utils/taxiIcons.js";
-import { HeatMapLayer } from "./HeatMapLayer.jsx";
+import { HeatMapControl } from "./HeatMapControl.jsx";
 
 const BEIJING_CENTER = [39.9042, 116.4074];
 const DEFAULT_ZOOM = 12;
