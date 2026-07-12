@@ -17,8 +17,9 @@ export function HeatMapLayer({ cells }) {
       radius: 80,
       blur: 35,
       maxZoom: 5,
+      ocopacity: 0.3,
       // max: 40.0, //TODO: this is a magic number, should be configurable
-      max: 100.0,
+      max: 600,
     }).addTo(map);
 
     return () => {
