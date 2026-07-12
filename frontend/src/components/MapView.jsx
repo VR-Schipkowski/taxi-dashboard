@@ -29,7 +29,12 @@ function RecenterMap({ selectedTaxi }) {
     map.setView([latitude, longitude], map.getZoom(), {
       animate: true,
     });
-  }, [map, selectedTaxi?.taxi_id, selectedTaxi?.latitude, selectedTaxi?.longitude]);
+  }, [
+    map,
+    selectedTaxi?.taxi_id,
+    selectedTaxi?.latitude,
+    selectedTaxi?.longitude,
+  ]);
 
   return null;
 }

@@ -15,9 +15,24 @@ import { DebugAlerts } from "./components/DebugAlerts.jsx";
 import { getOpacity, normalizeAlarmTaxi } from "./utils/helper.js";
 
 const LATENCY_TREND_STYLES = {
-  up: { background: "#FAECE7", color: "#993C1D", border: "#F3B5A1", arrow: "↑" },
-  down: { background: "#E6F6ED", color: "#1F7A43", border: "#8FD5AE", arrow: "↓" },
-  stable: { background: "#F3F4F6", color: "#555", border: "#D1D5DB", arrow: "→" },
+  up: {
+    background: "#FAECE7",
+    color: "#993C1D",
+    border: "#F3B5A1",
+    arrow: "↑",
+  },
+  down: {
+    background: "#E6F6ED",
+    color: "#1F7A43",
+    border: "#8FD5AE",
+    arrow: "↓",
+  },
+  stable: {
+    background: "#F3F4F6",
+    color: "#555",
+    border: "#D1D5DB",
+    arrow: "→",
+  },
 };
 
 function App() {
@@ -158,7 +173,8 @@ function App() {
     [pathLocations],
   );
 
-  const latencyStyle = LATENCY_TREND_STYLES[latencyTrend] ?? LATENCY_TREND_STYLES.stable;
+  const latencyStyle =
+    LATENCY_TREND_STYLES[latencyTrend] ?? LATENCY_TREND_STYLES.stable;
 
   return (
     <div
@@ -226,7 +242,7 @@ function App() {
               fontSize: 12,
               fontWeight: 500,
               borderRadius: 4,
-              cursor: "pointer",
+              viosor: "pointer",
               border: "1px solid #1F9D55",
               padding: "2px 8px",
               background: activeFilters.speeding ? "#993C1D" : "#FAECE7",
@@ -269,7 +285,9 @@ function App() {
         >
           <strong>Latency:</strong>
           {latency !== null ? `${latency.toFixed(2)}s` : "N/A"}
-          {latencyTrend && <span style={{ fontWeight: 700 }}>{latencyStyle.arrow}</span>}
+          {latencyTrend && (
+            <span style={{ fontWeight: 700 }}>{latencyStyle.arrow}</span>
+          )}
         </span>
         {pathError && (
           <span
