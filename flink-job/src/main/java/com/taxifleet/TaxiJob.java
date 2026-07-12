@@ -90,7 +90,7 @@ public class TaxiJob {
         // TODO: currently we do not have parallelism since active alarmssweepfunction
         // cannot handle it
         private static DataStream<TaxiLocation> processOOAViolations(DataStream<TaxiLocation> locationStream,
-                        KafkaSink<String> violationsSink, ObjectMapper mapper) {
+                        KafkaSink<String> violationsSink, KafkaSink<String> outOfAreaDataSink, ObjectMapper mapper) {
                 SingleOutputStreamOperator<TaxiLocation> inAreaStream = locationStream
                                 .keyBy(loc -> loc.taxi_id)
                                 .process(new OutOfAreaProcessFunction());
@@ -118,6 +118,18 @@ public class TaxiJob {
                                         s.isOutOfArea = false;
                                         return s;
                                 });
+
+                outOfAreaStream
+                                .map(speed -> {
+                                        try {
+                                                return mapper.writeValueAsString(speed);
+                                        } catch (Exception e) {
+                                                throw new RuntimeException(e);
+                                        }
+                                })
+                                .returns(String.class)
+                                .sinkTo(outOfAreaDataSink)
+                                .name("Publish Out-of-Area Taxi Data");
 
                 DataStream<String> areaSnapshot = outOfAreaStream
                                 .union(ooaReturnedStream)
@@ -181,6 +193,7 @@ public class TaxiJob {
 
                 ObjectMapper mapper = new ObjectMapper();
                 KafkaSink<String> violationsSink = createKafkaSink("taxi-area-violations");
+                KafkaSink<String> outOfAreaDataSink = createKafkaSink("taxi-out-of-area-data");
                 KafkaSink<String> processedSink = createKafkaSink("taxi-processed");
                 KafkaSink<String> speedingSink = createKafkaSink("taxi-speeding");
                 KafkaSink<String> heatmapSink = createKafkaSink("taxi-heatmap");
@@ -196,7 +209,7 @@ public class TaxiJob {
                 DataStream<TaxiLocation> filteredLocationStream = throttleLocations(locationStream);
                 // now first parse in area/out of area
                 DataStream<TaxiLocation> inAreaStream = processOOAViolations(filteredLocationStream, violationsSink,
-                                mapper);
+                                outOfAreaDataSink, mapper);
                 // only pass in area passed to speeding
                 SingleOutputStreamOperator<TaxiSpeed> speedStream = calculateSpeed(inAreaStream);
 
