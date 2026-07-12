@@ -20,6 +20,19 @@ const LATENCY_TREND_STYLES = {
   stable: { background: "#F3F4F6", color: "#555", border: "#D1D5DB", arrow: "→" },
 };
 
+const STAT_CHIP_STYLE = {
+  fontSize: 13,
+  fontWeight: 500,
+  color: "#555",
+  background: "#F3F4F6",
+  border: "1px solid #D1D5DB",
+  borderRadius: 4,
+  padding: "2px 8px",
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+};
+
 function App() {
   const now = useNow();
   const debugLog = useDebugLog();
@@ -181,114 +194,138 @@ function App() {
           padding: "10px 16px",
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           gap: 12,
           borderBottom: "1px solid #e5e7eb",
           flexShrink: 0,
           background: "#fff",
         }}
       >
-        <h1 style={{ margin: 0, fontSize: 18 }}>🚖 Taxi Live-Tracker</h1>
-        <span style={{ fontSize: 13, color: "#555" }}>
-          <strong>Status:</strong>{" "}
-          <span style={{ color: isConnected ? "#16a34a" : "#dc2626" }}>
-            {status}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 20,
+              fontWeight: 700,
+              letterSpacing: "-0.3px",
+              color: "#111827",
+              whiteSpace: "nowrap",
+            }}
+          >
+            🚖 Taxi Live-Tracker
+          </h1>
+          <span style={STAT_CHIP_STYLE}>
+            <strong>Status:</strong>
+            <span style={{ color: isConnected ? "#16a34a" : "#dc2626" }}>
+              {status}
+            </span>
           </span>
-        </span>
-        <span style={{ fontSize: 13, color: "#555" }}>
-          <strong>Active:</strong> {visibleTaxis.length}
-        </span>
-        <span style={{ fontSize: 13, color: "#555" }}>
-          <strong>Total distance travelled:</strong>{" "}
-          {totalDistanceAll != null
-            ? `${totalDistanceAll.toFixed(1)} km`
-            : "N/A"}
-        </span>
-
-        <TaxiSearchBox
-          onSelect={selectTaxi}
-          onClear={clearSelection}
-          selectedTaxiId={selectedTaxiId}
-        />
-
-        {selectedTaxiId !== null && (
-          <span
-            style={{
-              fontSize: 12,
-              background: "#EFF6FF",
-              color: "#1D4ED8",
-              padding: "2px 8px",
-              borderRadius: 4,
-              fontWeight: 500,
-            }}
-          >
-            focused taxi: {selectedTaxiId}
+          <span style={STAT_CHIP_STYLE}>
+            <strong>Active:</strong> {visibleTaxis.length}
           </span>
-        )}
-        {speedingIncidents.length > 0 && (
-          <button
-            onClick={() => toggleViolationFilter("speeding")}
-            style={{
-              fontSize: 12,
-              fontWeight: 500,
-              borderRadius: 4,
-              cursor: "pointer",
-              border: "1px solid #1F9D55",
-              padding: "2px 8px",
-              background: activeFilters.speeding ? "#993C1D" : "#FAECE7",
-              color: activeFilters.speeding ? "#fff" : "#993C1D",
-            }}
-          >
-            ⚠️ {speedingIncidents.length} speeding
-          </button>
-        )}
-        {areaViolations.length > 0 && (
-          <button
-            onClick={() => toggleViolationFilter("area")}
-            style={{
-              fontSize: 12,
-              fontWeight: 500,
-              borderRadius: 4,
-              cursor: "pointer",
-              border: "1px solid #1F9D55",
-              padding: "2px 8px",
-              background: activeFilters.area ? "#1F7A43" : "#E6F6ED",
-              color: activeFilters.area ? "#fff" : "#1F7A43",
-            }}
-          >
-            🗺️ {areaViolations.length} area violations
-          </button>
-        )}
-        <span
+          <span style={STAT_CHIP_STYLE}>
+            <strong>Total distance travelled:</strong>
+            {totalDistanceAll != null
+              ? `${totalDistanceAll.toFixed(1)} km`
+              : "N/A"}
+          </span>
+        </div>
+
+        <div
           style={{
-            fontSize: 13,
-            fontWeight: 500,
-            borderRadius: 4,
-            padding: "2px 8px",
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
-            gap: 4,
-            border: `1px solid ${latencyStyle.border}`,
-            background: latencyStyle.background,
-            color: latencyStyle.color,
+            gap: 12,
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
           }}
         >
-          <strong>Latency:</strong>
-          {latency !== null ? `${latency.toFixed(2)}s` : "N/A"}
-          {latencyTrend && <span style={{ fontWeight: 700 }}>{latencyStyle.arrow}</span>}
-        </span>
-        {pathError && (
+          <TaxiSearchBox
+            onSelect={selectTaxi}
+            onClear={clearSelection}
+            selectedTaxiId={selectedTaxiId}
+          />
+
+          {selectedTaxiId !== null && (
+            <span
+              style={{
+                fontSize: 12,
+                background: "#EFF6FF",
+                color: "#1D4ED8",
+                padding: "2px 8px",
+                borderRadius: 4,
+                fontWeight: 500,
+              }}
+            >
+              focused taxi: {selectedTaxiId}
+            </span>
+          )}
+          {speedingIncidents.length > 0 && (
+            <button
+              onClick={() => toggleViolationFilter("speeding")}
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                borderRadius: 4,
+                cursor: "pointer",
+                border: "1px solid #1F9D55",
+                padding: "2px 8px",
+                background: activeFilters.speeding ? "#993C1D" : "#FAECE7",
+                color: activeFilters.speeding ? "#fff" : "#993C1D",
+              }}
+            >
+              ⚠️ {speedingIncidents.length} speeding
+            </button>
+          )}
+          {areaViolations.length > 0 && (
+            <button
+              onClick={() => toggleViolationFilter("area")}
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                borderRadius: 4,
+                cursor: "pointer",
+                border: "1px solid #1F9D55",
+                padding: "2px 8px",
+                background: activeFilters.area ? "#1F7A43" : "#E6F6ED",
+                color: activeFilters.area ? "#fff" : "#1F7A43",
+              }}
+            >
+              🗺️ {areaViolations.length} area violations
+            </button>
+          )}
           <span
             style={{
-              fontSize: 12,
-              background: "#FAECE7",
-              color: "#993C1D",
-              padding: "2px 8px",
+              fontSize: 13,
+              fontWeight: 500,
               borderRadius: 4,
+              padding: "2px 8px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              border: `1px solid ${latencyStyle.border}`,
+              background: latencyStyle.background,
+              color: latencyStyle.color,
             }}
           >
-            {pathError}
+            <strong>Latency:</strong>
+            {latency !== null ? `${latency.toFixed(2)}s` : "N/A"}
+            {latencyTrend && <span style={{ fontWeight: 700 }}>{latencyStyle.arrow}</span>}
           </span>
-        )}
+          {pathError && (
+            <span
+              style={{
+                fontSize: 12,
+                background: "#FAECE7",
+                color: "#993C1D",
+                padding: "2px 8px",
+                borderRadius: 4,
+              }}
+            >
+              {pathError}
+            </span>
+          )}
+        </div>
       </header>
 
       {/* Main content */}
