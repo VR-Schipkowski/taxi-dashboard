@@ -58,15 +58,6 @@ function App() {
 
       appendLiveUpdate(t);
     },
-    // onSpeedingAlert: (incidents) => {
-    //   incidents.forEach((i) => {
-    //     debugLog.addEntry(
-    //       "speeding",
-    //       `taxi ${i.taxi_id} — ${i.speed.toFixed(1)} km/h`,
-    //       i.taxi_id
-    //     );
-    //   });
-    // },
     onAreaViolation: () => {
     },
     onOoaNotification: ({ trigger, taxiId }) => {
