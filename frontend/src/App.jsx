@@ -64,11 +64,10 @@ function App() {
 
       appendLiveUpdate(t);
     },
-    onAreaViolation: () => {
-    },
+    onAreaViolation: () => {},
     onOoaNotification: ({ trigger, taxiId }) => {
-      const label = trigger === 'entered' ? '🚨 left area' : '✅ returned';
-      debugLog.addEntry('area', `taxi ${taxiId} — ${label}`, taxiId);
+      const label = trigger === "entered" ? "🚨 left area" : "✅ returned";
+      debugLog.addEntry("area", `taxi ${taxiId} — ${label}`, taxiId);
     },
   });
 
@@ -196,8 +195,8 @@ function App() {
         <span style={{ fontSize: 13, color: "#555" }}>
           <strong>Total distance travelled:</strong>{" "}
           {totalDistanceAll != null
-              ? `${totalDistanceAll.toFixed(1)} km`
-              : "N/A"}
+            ? `${totalDistanceAll.toFixed(1)} km`
+            : "N/A"}
         </span>
 
         <TaxiSearchBox
@@ -298,7 +297,6 @@ function App() {
             violatingTaxiIds={violatingTaxiIds}
             pathPositions={pathPositions}
             onSelectTaxi={selectTaxi}
-            showHeatmap={true}
             heatmapCells={heatmapCells}
           />
         </div>
