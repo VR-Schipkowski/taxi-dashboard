@@ -22,4 +22,11 @@ current cloud_deploy branch which is regularly updated to represent **main** is 
 ```
 http://34.28.224.202:5173/
 ```
+# Link to docker images on docker hub
+You can find all of our docker images in docker hub under:
+
+```
+https://hub.docker.com/repository/docker/gesadolkemeyer/bd26_project_w4_b/general
+```
+You will need the `docker-compose.yaml` of this repo to use the images.
 
