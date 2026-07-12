@@ -21,14 +21,15 @@ function RecenterMap({ selectedTaxi }) {
   useEffect(() => {
     if (!selectedTaxi) return;
 
-    map.setView(
-      [selectedTaxi.latitude, selectedTaxi.longitude],
-      map.getZoom(),
-      {
-        animate: true,
-      },
-    );
-  }, [map, selectedTaxi]);
+    const latitude = Number(selectedTaxi.latitude);
+    const longitude = Number(selectedTaxi.longitude);
+
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+    map.setView([latitude, longitude], map.getZoom(), {
+      animate: true,
+    });
+  }, [map, selectedTaxi?.taxi_id, selectedTaxi?.latitude, selectedTaxi?.longitude]);
 
   return null;
 }
