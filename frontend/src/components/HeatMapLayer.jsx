@@ -25,6 +25,15 @@ export function HeatMapLayer({
       opacity,
     }).addTo(map);
 
+    // Defensive patch: leaflet.heat's internal redraw runs on a queued
+    // requestAnimationFrame. If the layer is removed before that frame
+    // fires, this._map is null and the original _redraw throws.
+    const originalRedraw = heatLayer._redraw.bind(heatLayer);
+    heatLayer._redraw = () => {
+      if (!heatLayer._map) return;
+      originalRedraw();
+    };
+
     layerRef.current = heatLayer;
 
     return () => {
@@ -34,21 +43,24 @@ export function HeatMapLayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map]);
 
-  // update points in place (no teardown -> no canvas artifacts)
+  // update points in place
   useEffect(() => {
-    if (!layerRef.current) return;
+    const layer = layerRef.current;
+    if (!layer || !layer._map) return; // not attached (yet, or anymore)
+
     const points = Object.values(cells).map((cell) => {
       const [lat, lon] = decodeCellId(cell.cellId);
       return [lat, lon, cell.taxiCount];
     });
-    layerRef.current.setLatLngs(points);
+    layer.setLatLngs(points);
   }, [cells]);
 
   // update options in place
   useEffect(() => {
-    if (!layerRef.current) return;
-    layerRef.current.setOptions({ radius, blur, maxZoom, max, opacity });
-    layerRef.current.redraw();
+    const layer = layerRef.current;
+    if (!layer || !layer._map) return;
+
+    layer.setOptions({ radius, blur, maxZoom, max, opacity });
   }, [radius, blur, maxZoom, max, opacity]);
 
   return null;
