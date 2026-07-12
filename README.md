@@ -26,7 +26,7 @@ http://34.28.224.202:5173/
 You can find all of our docker images in docker hub under:
 
 ```
-https://hub.docker.com/repository/docker/gesadolkemeyer/bd26_project_w4_b/general
+https://hub.docker.com/repository/docker/gesadolkemeyer/bd26_project_w4_b/tags
 ```
 You will need the `docker-compose.yaml` of this repo to use the images.
 
