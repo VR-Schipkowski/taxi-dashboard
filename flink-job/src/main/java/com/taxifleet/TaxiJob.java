@@ -188,8 +188,8 @@ public class TaxiJob {
         // ----------------- main function
         public static void main(String[] args) throws Exception {
                 StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-                // set paralism, hast to be matched the partitions in kafka, otherwisekafka will
-                // slow down as only so many patritions can be written to in parallel
+                // set parallelism to 8, since that muxh task slot we have
+                // 
                 env.setParallelism(8);
                 System.out.println("Flink Taxi Job starting - connecting to Kafka...");
 

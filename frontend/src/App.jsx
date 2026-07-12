@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import "./App.css";
 import "leaflet/dist/leaflet.css";
 
@@ -122,8 +122,9 @@ function App() {
     () =>
       allTaxis
         .map((t) => ({ ...t, _opacity: getOpacity(lastSeen[t.taxi_id], now) }))
-        .filter((t) => t._opacity > 0),
-    [allTaxis, lastSeen, now],
+        .filter((t) => t._opacity > 0)
+        .filter((t) => !violatingTaxiIds.has(String(t.taxi_id))),
+      [allTaxis, lastSeen, now, violatingTaxiIds],
   );
 
   const hasActiveFilter = activeFilters.speeding || activeFilters.area;
@@ -133,7 +134,10 @@ function App() {
     const violatorMap = {};
     if (activeFilters.speeding) {
       speedingIncidents.forEach((i) => {
-        violatorMap[i.taxi_id] = normalizeAlarmTaxi(i);
+        violatorMap[i.taxi_id] = {
+          ...taxiMap[i.taxi_id],
+          ...normalizeAlarmTaxi(i),
+        };
       });
     }
     if (activeFilters.area) {
@@ -151,6 +155,7 @@ function App() {
     visibleTaxis,
     speedingIncidents,
     areaViolations,
+    taxiMap
   ]);
 
   const taxis = useMemo(
