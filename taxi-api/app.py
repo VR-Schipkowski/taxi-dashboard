@@ -16,6 +16,7 @@ log = logging.getLogger("taxi-api")
 DATABASE_URL = os.environ["DATABASE_URL"]
 KAFKA_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", "kafka:9092")
 KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "taxi-processed")
+KAFKA_OOA_TOPIC = "taxi-out-of-area-data"
 KAFKA_GROUP_ID = os.environ.get("KAFKA_GROUP_ID", "taxi-api-consumer")
 
 app = FastAPI(title="Taxi Fleet API")
@@ -42,10 +43,6 @@ INSERT INTO taxi_speed (
     %(lastMoved)s, %(isParking)s, %(ingested_at)s
 )
 """
-
-KAFKA_TOPIC = os.environ.get("KAFKA_TOPIC", "taxi-processed")
-KAFKA_OOA_TOPIC = os.environ.get("KAFKA_OOA_TOPIC", "taxi-out-of-area")
-KAFKA_GROUP_ID = os.environ.get("KAFKA_GROUP_ID", "taxi-api-consumer")
 
 
 def store_event(record: dict) -> None:
