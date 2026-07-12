@@ -109,11 +109,11 @@ services:
         condition: service_healthy
     command: taskmanager
     deploy:
-      replicas: 1
+      replicas: 2
     environment:
       FLINK_PROPERTIES: |
         jobmanager.rpc.address: flink-jobmanager
-        taskmanager.numberOfTaskSlots: 1
+        taskmanager.numberOfTaskSlots: 4
 
   flink-job:
     build: ./flink-job
