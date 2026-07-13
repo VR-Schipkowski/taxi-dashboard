@@ -125,7 +125,7 @@ function App() {
     setSelectedTaxiId(null);
   }
 
-  const allTaxis = [...taxiMap.values()];
+  const allTaxis = useMemo(() => [...taxiMap.values()], [taxiMap]);
 
   const violatingTaxiIds = useMemo(
     () => new Set(areaViolations.map((v) => String(v.taxi_id))),
