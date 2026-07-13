@@ -15,10 +15,8 @@ const server = app.listen(5001, () =>
 const wss = new WebSocketServer({ server });
 
 const kafka = new Kafka({ brokers: ["kafka:9092"] });
-const TAXI_SNAPSHOT_TTL_MS =
-  Number(process.env.TAXI_SNAPSHOT_TTL_MS) || 15 * 60 * 1000;
-const TAXI_SNAPSHOT_MAX_SIZE =
-  Number(process.env.TAXI_SNAPSHOT_MAX_SIZE) || 5000;
+const TAXI_SNAPSHOT_TTL_MS = 2 * 60 * 1000;
+const TAXI_SNAPSHOT_MAX_SIZE = 1000;
 
 // Wrapper for taxi-api
 app.get("/taxis/:id/locations", async (req, res) => {
@@ -73,16 +71,9 @@ const areaViolationIndex = new Set();
 function rebuildSnapshotFromTaxiMap() {
   snapshot.taxis = [...taxiMap.values()];
   snapshot.stats.activeTaxiCount = snapshot.taxis.length;
-  snapshot.stats.totalDistanceAll = snapshot.taxis.reduce(
-    (sum, taxi) => sum + (taxi.totalDistance || 0),
-    0,
-  );
 }
 
-function broadcastSnapshot() {
-  broadcast({ type: "snapshot", ...snapshot });
-}
-
+//removes old taxis from the taximap andrebuil the snapshot
 function pruneStaleTaxis(now = Date.now()) {
   const staleTaxiIds = [];
 
@@ -102,8 +93,6 @@ function pruneStaleTaxis(now = Date.now()) {
     staleTaxiIds.push(...oldestTaxiIds);
   }
 
-  if (staleTaxiIds.length === 0) return false;
-
   const uniqueTaxiIds = new Set(staleTaxiIds);
   for (const taxiId of uniqueTaxiIds) {
     taxiMap.delete(taxiId);
@@ -116,6 +105,7 @@ function pruneStaleTaxis(now = Date.now()) {
 
 // on conect
 wss.on("connection", (ws) => {
+  pruneStaleTaxis();
   ws.send(
     JSON.stringify({
       type: "snapshot",
@@ -204,11 +194,15 @@ setInterval(async () => {
     );
   }
   const total = parseFloat(await redis.get("stats:total_distance")) || 0;
+  snapshot.stats.totalDistanceAll = total;
   broadcast({ type: "totalDistanceUpdate", totalDistanceAll: total });
 }, 5000);
 
 setInterval(async () => {
+  //update heatmap cells every 30s
   broadcast({ type: "heatmapUpdate", cellData: snapshot.heatmapCells });
+  //prune stale taxis every 30s to cep the set in check
+  pruneStaleTaxis();
 }, 1000 * 30);
 
 function broadcast(payload) {
@@ -251,15 +245,8 @@ async function startConsumers() {
         isParking: event.isParking ?? false,
       };
       broadcast({ type: "taxiUpdate", taxi });
-
       taxiMap.set(taxi.taxi_id, taxi);
       taxiLastSeenAt.set(taxi.taxi_id, Date.now());
-
-      rebuildSnapshotFromTaxiMap();
-
-      if (pruneStaleTaxis()) {
-        broadcastSnapshot();
-      }
     },
   });
 
@@ -346,12 +333,8 @@ async function startConsumers() {
 
 async function main() {
   await loadInitialSnapshot();
-  setInterval(() => {
-    if (pruneStaleTaxis()) {
-      broadcastSnapshot();
-    }
-  }, 60 * 1000);
   await startConsumers();
+
   console.log("Kafka consumers started");
 }
 
