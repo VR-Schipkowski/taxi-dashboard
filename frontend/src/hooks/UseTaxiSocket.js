@@ -68,12 +68,13 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
     const socket = new WebSocket(wsUrl);
 
     socket.onopen = () => setStatus("Connected – Live-Stream active");
+    let isCurrent = true;
 
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         const cb = callbacksRef.current;
-
+        if (!isCurrent) return;
         if (data.type === "snapshot") {
           const map = {};
           const seen = {};
@@ -142,9 +143,14 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
       }
     };
 
-    socket.onclose = () => setStatus("Lost connection to backend");
+    if (isCurrent) {
+      socket.onclose = () => setStatus("Lost connection to backend");
+    }
 
-    return () => socket.close();
+    return () => {
+      isCurrent = false;
+      socket.close();
+    };
   }, [wsUrl]);
 
   return {
