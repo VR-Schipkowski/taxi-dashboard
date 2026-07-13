@@ -64,7 +64,6 @@ const snapshot = {
   heatmapCells: {},
   clock: null,
 };
-const lastTime = null;
 const taxiMap = new Map();
 const taxiLastSeenAt = new Map();
 const areaViolationIndex = new Set();
@@ -248,12 +247,14 @@ async function startConsumers() {
       };
       broadcast({ type: "taxiUpdate", taxi });
       taxiMap.set(taxi.taxi_id, taxi);
+      taxiLastSeenAt.set(taxi.taxi_id, Date.now());
       const taxiTime = Date.parse(taxi.timestamp);
       if (Number.isFinite(taxiTime)) {
-        lastTime = lastTime === null ? taxiTime : Math.max(lastTime, taxiTime);
+        snapshot.clock =
+          snapshot.clock === null
+            ? taxiTime
+            : Math.max(snapshot.clock, taxiTime);
       }
-      snapshot.clock = lastTime;
-      taxiLastSeenAt.set(taxi.taxi_id, Date.now());
     },
   });
 
