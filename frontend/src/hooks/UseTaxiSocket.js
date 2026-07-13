@@ -176,7 +176,7 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
       }
     };
 
-    if (isCurrent) {
+    if (!isCurrent) {
       socket.onclose = () => setStatus("Lost connection to backend");
     }
 
