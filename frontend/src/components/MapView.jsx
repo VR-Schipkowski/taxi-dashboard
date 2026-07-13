@@ -136,7 +136,9 @@ export function MapView({
       style={{ height: "100%", width: "100%" }}
     >
       <RecenterMap
-        selectedTaxi={selectedTaxiId === null ? null : taxiMap[selectedTaxiId]}
+        selectedTaxi={
+          selectedTaxiId === null ? null : taxiMap.get(selectedTaxiId)
+        }
       />
       <TileLayer
         attribution='&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors'

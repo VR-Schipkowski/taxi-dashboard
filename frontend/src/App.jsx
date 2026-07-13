@@ -125,7 +125,7 @@ function App() {
     setSelectedTaxiId(null);
   }
 
-  const allTaxis = Object.values(taxiMap);
+  const allTaxis = [...taxiMap.values()];
 
   const violatingTaxiIds = useMemo(
     () => new Set(areaViolations.map((v) => String(v.taxi_id))),
@@ -149,7 +149,7 @@ function App() {
     if (activeFilters.speeding) {
       speedingIncidents.forEach((i) => {
         violatorMap[i.taxi_id] = {
-          ...taxiMap[i.taxi_id],
+          ...taxiMap.get(i.taxi_id),
           ...normalizeAlarmTaxi(i),
         };
       });
