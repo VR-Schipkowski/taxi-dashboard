@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { TAXI_UPDATE_FLUSH_INTERVAL_MS, WS_LINK } from "../config";
+import {
+  STALE_AFTER_MS,
+  TAXI_UPDATE_FLUSH_INTERVAL_MS,
+  WS_LINK,
+} from "../config";
 
 /**
  * Owns the WebSocket connection and all state driven by it: taxi positions,
@@ -49,10 +53,34 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
 
   useEffect(() => {
     const flush = setInterval(() => {
+      const now = Date.now();
+
+      // Remove taxis that have not been updated recently so the map only
+      // shows live data.
+      setLastSeen((prevSeen) => {
+        const nextSeen = { ...prevSeen };
+        const expiredTaxiIds = Object.keys(nextSeen).filter(
+          (id) => now - nextSeen[id] >= STALE_AFTER_MS,
+        );
+
+        if (expiredTaxiIds.length > 0) {
+          setTaxiMap((prevMap) => {
+            const nextMap = { ...prevMap };
+            expiredTaxiIds.forEach((id) => {
+              delete nextMap[id];
+              delete nextSeen[id];
+            });
+            return nextMap;
+          });
+        }
+
+        return nextSeen;
+      });
+
       const updates = pendingUpdates.current;
       if (Object.keys(updates).length === 0) return;
       pendingUpdates.current = {};
-      const updateTime = Date.now();
+      const updateTime = now;
       setTaxiMap((prev) => ({ ...prev, ...updates }));
       setLastSeen((prev) => {
         const next = { ...prev };
