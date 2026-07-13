@@ -67,6 +67,7 @@ function App() {
     latencyTrend,
     heatmapCells,
     totalDistanceAll,
+    clock,
   } = useTaxiSocket(WS_LINK, {
     onSnapshot: () => {
       // Position updates are no longer logged to the alerts panel; only
@@ -244,6 +245,10 @@ function App() {
             {totalDistanceAll != null
               ? `${totalDistanceAll.toFixed(1)} km`
               : "N/A"}
+          </span>
+          <span style={STAT_CHIP_STYLE}>
+            <strong>Clock:</strong>
+            {clock != null ? new Date(clock).toLocaleTimeString() : "N/A"}
           </span>
         </div>
 

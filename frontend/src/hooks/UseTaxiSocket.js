@@ -41,6 +41,7 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
   const [latencyTrend, setLatencyTrend] = useState(null);
   const [heatmapCells, setHeatmapCells] = useState({});
   const [totalDistanceAll, setTotalDistanceAll] = useState(null);
+  const [clock, setClock] = useState(null);
 
   // taxiUpdate messages are queued here and applied in one batch on the
   // interval below, instead of triggering a re-render per message.
@@ -90,6 +91,7 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
           setTotalDistanceAll(data.stats?.totalDistanceAll ?? null);
           cb.onSnapshot?.(data);
           setHeatmapCells(data.heatmapCells || {});
+          setClock(data.clock || null);
 
           if (data.stats && data.stats.avgLatencyMs) {
             const initialLatency = data.stats.avgLatencyMs / 1000;
@@ -137,6 +139,9 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
           setTotalDistanceAll(data.totalDistanceAll);
         } else if (data.type === "ooaNotification") {
           cb.onOoaNotification?.(data);
+        } else if (data.type === "clockUpdate") {
+          // Update the clock state with the received clock value
+          setClock(data.clock);
         }
       } catch (error) {
         console.error("Error parsing WebSocket data:", error);
@@ -163,5 +168,6 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
     latencyTrend,
     heatmapCells,
     totalDistanceAll,
+    clock,
   };
 }

@@ -62,8 +62,9 @@ const snapshot = {
   speedingIncidents: [],
   areaViolations: [],
   heatmapCells: {},
+  clock: null,
 };
-
+const lastTime = null;
 const taxiMap = new Map();
 const taxiLastSeenAt = new Map();
 const areaViolationIndex = new Set();
@@ -196,6 +197,7 @@ setInterval(async () => {
   const total = parseFloat(await redis.get("stats:total_distance")) || 0;
   snapshot.stats.totalDistanceAll = total;
   broadcast({ type: "totalDistanceUpdate", totalDistanceAll: total });
+  broadcast({ type: "clockUpdate", clock: snapshot.clock });
 }, 5000);
 
 setInterval(async () => {
@@ -246,6 +248,11 @@ async function startConsumers() {
       };
       broadcast({ type: "taxiUpdate", taxi });
       taxiMap.set(taxi.taxi_id, taxi);
+      const taxiTime = Date.parse(taxi.timestamp);
+      if (Number.isFinite(taxiTime)) {
+        lastTime = lastTime === null ? taxiTime : Math.max(lastTime, taxiTime);
+      }
+      snapshot.clock = lastTime;
       taxiLastSeenAt.set(taxi.taxi_id, Date.now());
     },
   });
