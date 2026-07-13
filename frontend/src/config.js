@@ -10,7 +10,7 @@ export const PATH_LOCATIONS_LIMIT = 120 * 8;
 export const PATH_TIME_INTERVAL = 60 * 8; // in minutes
 
 // Fading of stale markers
-export const STALE_AFTER_MS = 30 * 1000;
+export const STALE_AFTER_MS = 90 * 1000;
 
 // MAX Debug log entries
 export const DEBUG_LOG_MAX_ENTRIES = 300;
