@@ -92,18 +92,22 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
     }, TAXI_UPDATE_FLUSH_INTERVAL_MS);
     return () => clearInterval(flush);
   }, []);
-
+  const socketRef = useRef(null);
+  const isThisSocketCurrent = () => socketRef.current === socket;
   useEffect(() => {
     const socket = new WebSocket(wsUrl);
+    socketRef.current = socket;
 
-    socket.onopen = () => setStatus("Connected – Live-Stream active");
-    let isCurrent = true;
+    const isThisSocketCurrent = () => socketRef.current === socket;
+    socket.onopen = () => {
+      if (isThisSocketCurrent()) setStatus("Connected – Live-Stream active");
+    };
 
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         const cb = callbacksRef.current;
-        if (!isCurrent) return;
+        if (!isThisSocketCurrent()) return;
         if (data.type === "snapshot") {
           const map = {};
           const seen = {};
@@ -176,12 +180,12 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
       }
     };
 
-    if (!isCurrent) {
+    if (isThisSocketCurrent()) {
       socket.onclose = () => setStatus("Lost connection to backend");
     }
 
     return () => {
-      isCurrent = false;
+      if (socketRef.current === socket) socketRef.current = null;
       socket.close();
     };
   }, [wsUrl]);
