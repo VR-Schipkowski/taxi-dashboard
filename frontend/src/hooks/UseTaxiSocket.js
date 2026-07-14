@@ -60,32 +60,6 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
 
   useEffect(() => {
     const flush = setInterval(() => {
-      const now = Date.now();
-
-      // Remove taxis that have not been updated recently so the map only
-      // shows live data. Bails out without allocating when nothing expired.
-      setLastSeen((prevSeen) => {
-        const expiredTaxiIds = Object.keys(prevSeen).filter(
-          (id) => now - prevSeen[id] >= STALE_AFTER_MS,
-        );
-        if (expiredTaxiIds.length === 0) return prevSeen;
-
-        const nextSeen = { ...prevSeen };
-        expiredTaxiIds.forEach((id) => {
-          delete nextSeen[id];
-        });
-
-        setTaxiMap((prevMap) => {
-          const nextMap = new Map(prevMap);
-          expiredTaxiIds.forEach((id) => {
-            nextMap.delete(id);
-          });
-          return nextMap;
-        });
-
-        return nextSeen;
-      });
-
       const updates = pendingUpdates.current;
       if (Object.keys(updates).length === 0) return;
       pendingUpdates.current = {};
