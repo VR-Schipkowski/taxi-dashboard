@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import "./App.css";
 import "leaflet/dist/leaflet.css";
 
-import { WS_LINK } from "./config.js";
+import { WS_LINK, STALE_AFTER_MS } from "./config.js";
 import { useDebugLog } from "./hooks/UseDebugLog.js";
 import { useNow } from "./hooks/UseNow";
 import { useTaxiPath } from "./hooks/UseTaxiPath";
