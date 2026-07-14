@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import "./App.css";
 import "leaflet/dist/leaflet.css";
 
-import { WS_LINK } from "./config.js";
+import { WS_LINK, STALE_AFTER_MS } from "./config.js";
 import { useDebugLog } from "./hooks/UseDebugLog.js";
 import { useNow } from "./hooks/UseNow";
 import { useTaxiPath } from "./hooks/UseTaxiPath";
@@ -67,6 +67,7 @@ function App() {
     latencyTrend,
     heatmapCells,
     totalDistanceAll,
+    clock,
   } = useTaxiSocket(WS_LINK, {
     onSnapshot: () => {
       // Position updates are no longer logged to the alerts panel; only
@@ -124,19 +125,29 @@ function App() {
     setSelectedTaxiId(null);
   }
 
-  const allTaxis = Object.values(taxiMap);
+  const allTaxis = useMemo(() => [...taxiMap.values()], [taxiMap]);
 
   const violatingTaxiIds = useMemo(
     () => new Set(areaViolations.map((v) => String(v.taxi_id))),
     [areaViolations],
   );
 
+  const FADE_WINDOW_MS = STALE_AFTER_MS * 0.3; // tune: how long before expiry fading starts
+
   const visibleTaxis = useMemo(
     () =>
       allTaxis
-        .map((t) => ({ ...t, _opacity: getOpacity(lastSeen[t.taxi_id], now) }))
-        .filter((t) => t._opacity > 0)
-        .filter((t) => !violatingTaxiIds.has(String(t.taxi_id))),
+        .filter((t) => !violatingTaxiIds.has(String(t.taxi_id)))
+        .map((t) => {
+          const age = now - (lastSeen[t.taxi_id] ?? 0);
+          // Fresh taxis skip the opacity calculation entirely — no new object needed
+          // beyond what's structurally required for the map to consume it.
+          if (age < STALE_AFTER_MS - FADE_WINDOW_MS) {
+            return t._opacity === 1 ? t : { ...t, _opacity: 1 };
+          }
+          return { ...t, _opacity: getOpacity(lastSeen[t.taxi_id], now) };
+        })
+        .filter((t) => t._opacity > 0),
     [allTaxis, lastSeen, now, violatingTaxiIds],
   );
 
@@ -148,7 +159,7 @@ function App() {
     if (activeFilters.speeding) {
       speedingIncidents.forEach((i) => {
         violatorMap[i.taxi_id] = {
-          ...taxiMap[i.taxi_id],
+          ...taxiMap.get(i.taxi_id),
           ...normalizeAlarmTaxi(i),
         };
       });
@@ -244,6 +255,10 @@ function App() {
             {totalDistanceAll != null
               ? `${totalDistanceAll.toFixed(1)} km`
               : "N/A"}
+          </span>
+          <span style={STAT_CHIP_STYLE}>
+            <strong>Clock:</strong>
+            {clock != null ? new Date(clock).toLocaleTimeString() : "N/A"}
           </span>
         </div>
 

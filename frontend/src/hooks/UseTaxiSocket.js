@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { TAXI_UPDATE_FLUSH_INTERVAL_MS, WS_LINK } from "../config";
+import {
+  STALE_AFTER_MS,
+  TAXI_UPDATE_FLUSH_INTERVAL_MS,
+  WS_LINK,
+} from "../config";
 
 /**
  * Owns the WebSocket connection and all state driven by it: taxi positions,
@@ -29,7 +33,8 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
     callbacksRef.current = callbacks;
   });
 
-  const [taxiMap, setTaxiMap] = useState({});
+  const [taxiMap, setTaxiMap] = useState(() => new Map());
+
   const [lastSeen, setLastSeen] = useState({});
   const [speedingIncidents, setSpeedingIncidents] = useState([]);
   const [areaViolations, setAreaViolations] = useState([]);
@@ -41,18 +46,31 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
   const [latencyTrend, setLatencyTrend] = useState(null);
   const [heatmapCells, setHeatmapCells] = useState({});
   const [totalDistanceAll, setTotalDistanceAll] = useState(null);
+  const [clock, setClock] = useState(null);
 
   // taxiUpdate messages are queued here and applied in one batch on the
   // interval below, instead of triggering a re-render per message.
   const pendingUpdates = useRef({});
 
+  // Owns the "live" socket for this hook instance. Handlers compare against
+  // this ref (rather than a plain boolean flag) so that stale async events
+  // from a superseded socket never get applied, even across multiple rapid
+  // effect re-runs (e.g. StrictMode double-invoke).
+  const socketRef = useRef(null);
+
   useEffect(() => {
     const flush = setInterval(() => {
       const updates = pendingUpdates.current;
+      const updateTime = Date.now();
       if (Object.keys(updates).length === 0) return;
       pendingUpdates.current = {};
-      const updateTime = Date.now();
-      setTaxiMap((prev) => ({ ...prev, ...updates }));
+      setTaxiMap((prev) => {
+        const next = new Map(prev);
+        Object.keys(updates).forEach((id) => {
+          next.set(id, updates[id]);
+        });
+        return next;
+      });
       setLastSeen((prev) => {
         const next = { ...prev };
         Object.keys(updates).forEach((id) => {
@@ -66,20 +84,25 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
 
   useEffect(() => {
     const socket = new WebSocket(wsUrl);
+    socketRef.current = socket;
 
-    socket.onopen = () => setStatus("Connected – Live-Stream active");
+    const isThisSocketCurrent = () => socketRef.current === socket;
+
+    socket.onopen = () => {
+      if (isThisSocketCurrent()) setStatus("Connected – Live-Stream active");
+    };
 
     socket.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        if (!isThisSocketCurrent()) return;
         const cb = callbacksRef.current;
-
         if (data.type === "snapshot") {
-          const map = {};
+          const map = new Map();
           const seen = {};
           const receivedAt = Date.now();
           (data.taxis || []).forEach((t) => {
-            map[t.taxi_id] = t;
+            map.set(t.taxi_id, t);
             seen[t.taxi_id] = receivedAt;
           });
           setTaxiMap(map);
@@ -89,6 +112,7 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
           setTotalDistanceAll(data.stats?.totalDistanceAll ?? null);
           cb.onSnapshot?.(data);
           setHeatmapCells(data.heatmapCells || {});
+          setClock(data.clock || null);
 
           if (data.stats && data.stats.avgLatencyMs) {
             const initialLatency = data.stats.avgLatencyMs / 1000;
@@ -114,9 +138,7 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
                   ? "stable"
                   : newLatency > previous
                     ? "up"
-                    : newLatency < previous
-                      ? "down"
-                      : null,
+                    : "down",
               );
             }
             return newHistory;
@@ -130,21 +152,32 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
           setAreaViolations(violations);
           cb.onAreaViolation?.(violations);
         } else if (data.type === "heatmapUpdate") {
-          const cells = data.cellData;
-          setHeatmapCells(cells);
+          setHeatmapCells(data.cellData);
         } else if (data.type === "totalDistanceUpdate") {
           setTotalDistanceAll(data.totalDistanceAll);
         } else if (data.type === "ooaNotification") {
           cb.onOoaNotification?.(data);
+        } else if (data.type === "clockUpdate") {
+          setClock(data.clock);
         }
       } catch (error) {
         console.error("Error parsing WebSocket data:", error);
       }
     };
 
-    socket.onclose = () => setStatus("Lost connection to backend");
+    socket.onerror = (err) => {
+      console.error("WebSocket error:", err);
+      if (isThisSocketCurrent()) setStatus("Connection error");
+    };
 
-    return () => socket.close();
+    socket.onclose = () => {
+      if (isThisSocketCurrent()) setStatus("Lost connection to backend");
+    };
+
+    return () => {
+      if (socketRef.current === socket) socketRef.current = null;
+      socket.close();
+    };
   }, [wsUrl]);
 
   return {
@@ -157,5 +190,6 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
     latencyTrend,
     heatmapCells,
     totalDistanceAll,
+    clock,
   };
 }

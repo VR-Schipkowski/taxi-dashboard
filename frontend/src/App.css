@@ -46,7 +46,8 @@
   z-index: 1;
   top: 34px;
   height: 28px;
-  transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg) scale(1.4);
+  transform: perspective(2000px) rotateZ(300deg) rotateX(44deg) rotateY(39deg)
+    scale(1.4);
 }
 
 .hero .vite {
@@ -54,7 +55,8 @@
   top: 107px;
   height: 26px;
   width: auto;
-  transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg) scale(0.8);
+  transform: perspective(2000px) rotateZ(300deg) rotateX(40deg) rotateY(39deg)
+    scale(0.8);
 }
 
 /* Center section */
@@ -81,7 +83,7 @@
   text-align: left;
 }
 
-#next-steps>div {
+#next-steps > div {
   flex: 1 1 0;
   padding: 32px;
 }
@@ -98,7 +100,7 @@
     text-align: center;
   }
 
-  #next-steps>div {
+  #next-steps > div {
     padding: 24px 20px;
   }
 }
@@ -188,7 +190,7 @@
 
 .ticks::before,
 .ticks::after {
-  content: '';
+  content: "";
   position: absolute;
   top: -4.5px;
   border: 5px solid transparent;
@@ -215,11 +217,6 @@
     drop-shadow(0 0 6px rgba(37, 99, 235, 0.7));
 }
 
-.leaflet-marker-icon,
-.leaflet-marker-shadow {
-  transition: opacity 1s linear;
-}
-
 .leaflet-marker-icon.speeding-marker {
   filter: hue-rotate(150deg) saturate(6) brightness(0.9);
   opacity: 1;
@@ -230,11 +227,14 @@
   opacity: 1;
 }
 
-.taxi-dot-icon { background: transparent; border: none; }
+.taxi-dot-icon {
+  background: transparent;
+  border: none;
+}
 .taxi-dot {
   border-radius: 50%;
   border: 2px solid #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -243,22 +243,53 @@
   }
 }
 @keyframes taxi-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(29,78,216,0.45); }
-  70% { box-shadow: 0 0 0 10px rgba(29,78,216,0); }
-  100% { box-shadow: 0 0 0 0 rgba(29,78,216,0); }
+  0% {
+    box-shadow: 0 0 0 0 rgba(29, 78, 216, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(29, 78, 216, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(29, 78, 216, 0);
+  }
 }
 
-.taxi-cluster { display: flex; align-items: center; justify-content: center; }
+.taxi-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .taxi-cluster .cluster-inner {
-  width: 100%; height: 100%; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  font-family: sans-serif; font-weight: 600; color: #fff;
-  border: 2px solid rgba(255,255,255,0.85);
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: sans-serif;
+  font-weight: 600;
+  color: #fff;
+  border: 2px solid rgba(255, 255, 255, 0.85);
 }
-.cluster-sm .cluster-inner { font-size: 12px; }
-.cluster-md .cluster-inner { font-size: 13px; }
-.cluster-lg .cluster-inner { font-size: 14px; }
+.cluster-sm .cluster-inner {
+  font-size: 12px;
+}
+.cluster-md .cluster-inner {
+  font-size: 13px;
+}
+.cluster-lg .cluster-inner {
+  font-size: 14px;
+}
 
-.cluster-normal .cluster-inner   { background: #378ADD; box-shadow: 0 0 0 4px rgba(55,138,221,0.25); }
-.cluster-speeding .cluster-inner { background: #E2462F; box-shadow: 0 0 0 4px rgba(226,70,47,0.3); }
-.cluster-area .cluster-inner     { background: #F59E0B; box-shadow: 0 0 0 4px rgba(245,158,11,0.3); }
+.cluster-normal .cluster-inner {
+  background: #378add;
+  box-shadow: 0 0 0 4px rgba(55, 138, 221, 0.25);
+}
+.cluster-speeding .cluster-inner {
+  background: #e2462f;
+  box-shadow: 0 0 0 4px rgba(226, 70, 47, 0.3);
+}
+.cluster-area .cluster-inner {
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.3);
+}
