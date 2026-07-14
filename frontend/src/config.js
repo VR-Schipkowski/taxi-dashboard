@@ -3,8 +3,9 @@
 
 // //uncomment for local
 
-export const BACKEND = "http://localhost:5001";
-export const WS_LINK = "ws://localhost:5001";
+export const BACKEND = "http://34.28.224.202:5001";
+export const WS_LINK = "ws://34.28.224.202:5001";
+
 // consts for path display number of points and time interval for path display
 export const PATH_LOCATIONS_LIMIT = 120 * 8;
 export const PATH_TIME_INTERVAL = 60 * 8; // in minutes
