@@ -61,6 +61,7 @@ export function useTaxiSocket(wsUrl = WS_LINK, callbacks = {}) {
   useEffect(() => {
     const flush = setInterval(() => {
       const updates = pendingUpdates.current;
+      const now = Date.now();
       if (Object.keys(updates).length === 0) return;
       pendingUpdates.current = {};
       const updateTime = now;
