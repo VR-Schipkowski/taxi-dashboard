@@ -217,12 +217,6 @@
     drop-shadow(0 0 6px rgba(37, 99, 235, 0.7));
 }
 
-.leaflet-marker-icon,
-.leaflet-marker-shadow {
-  transition: opacity 1s linear;
-  transition: transform 0.45s linear;
-}
-
 .leaflet-marker-icon.speeding-marker {
   filter: hue-rotate(150deg) saturate(6) brightness(0.9);
   opacity: 1;

@@ -132,12 +132,22 @@ function App() {
     [areaViolations],
   );
 
+  const FADE_WINDOW_MS = STALE_AFTER_MS * 0.3; // tune: how long before expiry fading starts
+
   const visibleTaxis = useMemo(
     () =>
       allTaxis
-        .map((t) => ({ ...t, _opacity: getOpacity(lastSeen[t.taxi_id], now) }))
-        .filter((t) => t._opacity > 0)
-        .filter((t) => !violatingTaxiIds.has(String(t.taxi_id))),
+        .filter((t) => !violatingTaxiIds.has(String(t.taxi_id)))
+        .map((t) => {
+          const age = now - (lastSeen[t.taxi_id] ?? 0);
+          // Fresh taxis skip the opacity calculation entirely — no new object needed
+          // beyond what's structurally required for the map to consume it.
+          if (age < STALE_AFTER_MS - FADE_WINDOW_MS) {
+            return t._opacity === 1 ? t : { ...t, _opacity: 1 };
+          }
+          return { ...t, _opacity: getOpacity(lastSeen[t.taxi_id], now) };
+        })
+        .filter((t) => t._opacity > 0),
     [allTaxis, lastSeen, now, violatingTaxiIds],
   );
 
