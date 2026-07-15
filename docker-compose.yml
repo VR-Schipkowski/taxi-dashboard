@@ -49,7 +49,8 @@ services:
         condition: service_completed_successfully
     volumes:
       #- "./provider/data/test/taxi-data:/taxi-data:ro"
-      - "./provider/data/release/taxi_log_2008_by_id:/taxi-data:ro"
+      #- "./provider/data/release/taxi_log_2008_by_id:/taxi-data:ro"
+      - "./provider/data/presentation/taxi-data:/taxi-data:ro"
     command: --data-dir /taxi-data --bootstrap-servers kafka:9092 --speed-factor 1
     ulimits:
       nofile:
